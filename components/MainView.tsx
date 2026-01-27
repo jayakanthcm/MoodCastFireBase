@@ -181,6 +181,19 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
           .filter(s => s.dist <= scanRange); // Apply Distance Filter
 
         setNearbyUsers(mapped);
+
+        // Self-Reporting 'On Radar' Count (Vibe Coding Feature)
+        // We calculate how many people are near US, and publish it so others can see on our stamp.
+        if (isBroadcasting) {
+          const mySession = sessions.find(s => s.uid === profile.id);
+          const currentCount = mySession?.stats?.inRadar || 0;
+          const newCount = mapped.length;
+
+          if (currentCount !== newCount) {
+            console.log(`[Radar] Updating my On-Radar count: ${currentCount} -> ${newCount}`);
+            FirestoreService.updateInRadarCount(profile.id, newCount);
+          }
+        }
       }
     );
 

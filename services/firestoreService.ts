@@ -106,6 +106,14 @@ export const FirestoreService = {
         });
     },
 
+    async updateInRadarCount(uid: string, count: number): Promise<void> {
+        const ref = doc(db, SESSIONS_COLLECTION, uid);
+        // Safe update using dot notation to avoid overwriting 'interested'
+        await updateDoc(ref, {
+            'stats.inRadar': count
+        });
+    },
+
     // Simplified Radar Query: Fetch all recently active auras (Limit 100)
     // We filter by distance on the client to ensure reliability for the MVP.
     subscribeToRadar(center: [number, number], radiusInMeters: number, callback: (sessions: LiveAura[]) => void): () => void {
