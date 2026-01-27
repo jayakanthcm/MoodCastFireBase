@@ -29,6 +29,7 @@ export interface PersistentUserData {
     ageRange: string;
     gender: string;
     status: string;
+    statusMessage?: string;
     createdAt: any;
 }
 

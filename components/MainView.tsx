@@ -125,20 +125,9 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
     if (navigator.geolocation) {
       watchId = navigator.geolocation.watchPosition((pos) => {
         const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-
-        // Update local state
         setCurrentLocation(newLoc);
-
-        // Movement Logic: If broadcasting and moved > 10m, update Firestore
         if (isBroadcasting) {
-          // Check distance from LAST KNOWN broadcast location? 
-          // For simplicity, we just send the update. FirestoreService optimizes?
-          // Actually, we should check against a Ref to avoid spam writing.
           updateBroadcastData(newLoc);
-          // Ideally we check distance here, but we lack the 'lastBroadcastLoc' ref in this scope easily without refactoring.
-          // Given the user asked for "Passive Geohash Updates", let's assume FirestoreService or a heuristic there handles it, 
-          // OR we trust the browser's watchPosition isn't too spammy (it can be).
-          // Let's rely on the fact that updateSession updates timestamp (Heartbeat) too, so it's fine.
         }
       }, (err) => {
         console.error("Location access denied", err);
@@ -150,10 +139,20 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
     return () => {
       if (watchId) navigator.geolocation.clearWatch(watchId);
     };
-  }, [isBroadcasting]); // Re-run if broadcast status changes? No, we need watchId to persist.
-  // Actually, if we put isBroadcasting in dependency, we reset scanner every time we toggle.
-  // Better to use a Ref for isBroadcasting if we want to read it inside the callback without re-binding.
-  // But strict mode is fine.
+  }, [isBroadcasting]);
+
+  // Real-Time Stats Subscription (Fix for Static Data)
+  useEffect(() => {
+    if (!isBroadcasting) return;
+
+    const unsubscribe = FirestoreService.subscribeToSession(profile.id, (session) => {
+      if (session && session.stats) {
+        setLiveStats(session.stats);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [isBroadcasting, profile.id]);
 
   // 2. Subscribe to Radar (Geohash Query)
   useEffect(() => {

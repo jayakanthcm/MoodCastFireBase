@@ -10,16 +10,16 @@ import { FirestoreService } from './services/firestoreService';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { AdminPanel } from './components/AdminPanel';
 
-const App: React.FC = () => {
-  const initialState: AppState = {
-    isOnboarded: false,
-    isVerified: false,
-    profile: null,
-    currentStep: 'AGREEMENT',
-    unverifiedEmail: null,
-  };
+const textInitialState: AppState = {
+  isOnboarded: false,
+  isVerified: false,
+  profile: null,
+  currentStep: 'AGREEMENT',
+  unverifiedEmail: null,
+};
 
-  const [state, setState] = useState<AppState>(initialState);
+const App: React.FC = () => {
+  const [state, setState] = useState<AppState>(textInitialState);
   const [showAdmin, setShowAdmin] = useState(window.location.hash === '#admin-aura');
 
   useEffect(() => {
@@ -57,7 +57,7 @@ const App: React.FC = () => {
                 gender: persistentProfile.gender as any,
                 ageRange: persistentProfile.ageRange as any,
                 status: persistentProfile.status as any,
-                statusMessage: "", // These are ephemeral, not in persistent profile yet based on plan
+                statusMessage: persistentProfile.statusMessage || "",
                 icon: persistentProfile.icon,
                 stats: { interested: 0, inRadar: 0 }
               },
@@ -83,7 +83,6 @@ const App: React.FC = () => {
             });
           } else {
             // User needs to create a profile (First Time)
-            // We can use a temporary profile state to prep for setup
             const tempProfile: UserProfile = {
               id: user.uid,
               identity: {
@@ -115,12 +114,10 @@ const App: React.FC = () => {
           }
         } catch (error) {
           console.error("Error fetching profile:", error);
-          // Fallback or error state?
         }
       } else {
         // User logged out
         setState(prev => {
-          // If we are waiting for verification (sign up flow), keep the state
           if (prev.unverifiedEmail && prev.currentStep === 'VERIFICATION') {
             return prev;
           }
@@ -131,15 +128,6 @@ const App: React.FC = () => {
 
     return () => unsubscribe();
   }, []);
-
-  // Workaround because initialState is not available inside the closure if I used the variable directly without recreating
-  const textInitialState: AppState = {
-    isOnboarded: false,
-    isVerified: false,
-    profile: null,
-    currentStep: 'AGREEMENT',
-    unverifiedEmail: null,
-  };
 
   const nextStep = () => {
     setState(prev => {
@@ -174,58 +162,80 @@ const App: React.FC = () => {
         ageRange: profile.identity.ageRange,
         gender: profile.identity.gender,
         status: profile.identity.status,
-        createdAt: null // Service handles timestamps or we merge
+        statusMessage: profile.identity.statusMessage,
+        createdAt: null
       });
 
       setState(prev => ({ ...prev, profile, currentStep: 'MAIN' }));
     } catch (error) {
       console.error("Error saving profile:", error);
-      // Handle error (maybe show a toast or alert)
+    }
+  };
+
+  const syncProfileUpdate = async (updatedProfile: UserProfile, changes: Partial<UserProfile['identity']>) => {
+    try {
+      // Persist to Profile Collection
+      await FirestoreService.saveUserProfile({
+        uid: updatedProfile.id,
+        // We must merge, but saveUserProfile expects full object in this implementation.
+        // Ideally we optimize this, but for now we send the updated full identity.
+        email: auth.currentUser?.email || "",
+        nickname: updatedProfile.identity.nickname,
+        icon: updatedProfile.identity.icon,
+        ageRange: updatedProfile.identity.ageRange,
+        gender: updatedProfile.identity.gender,
+        status: updatedProfile.identity.status,
+        statusMessage: updatedProfile.identity.statusMessage,
+        createdAt: null
+      });
+
+      // Also update Active Session if broadcasting
+      await FirestoreService.updateSession(updatedProfile.id, changes);
+    } catch (err) {
+      console.error("Failed to sync profile update:", err);
     }
   };
 
   const handleUpdateMood = (mood: MoodType) => {
     if (state.profile) {
-      setState(prev => ({
-        ...prev,
-        profile: { ...prev.profile!, mood }
-      }));
+      const updated = { ...state.profile, mood };
+      setState(prev => ({ ...prev, profile: updated }));
+      // Mood is usually broadcast-only, but we can save it if we want persistent mood.
+      // For now, MainView handles mood broadcast updates locally interactively. 
+      // But let's ensure consistency if needed. MainView calls updateBroadcastData already.
     }
   };
 
   const handleUpdateNickname = (nickname: string) => {
     if (state.profile) {
-      setState(prev => ({
-        ...prev,
-        profile: {
-          ...prev.profile!,
-          identity: { ...prev.profile!.identity, nickname }
-        }
-      }));
+      const updated = {
+        ...state.profile,
+        identity: { ...state.profile.identity, nickname }
+      };
+      setState(prev => ({ ...prev, profile: updated }));
+      syncProfileUpdate(updated, { nickname });
     }
   };
 
   const handleUpdateStatusMessage = (statusMessage: string) => {
     if (state.profile) {
-      setState(prev => ({
-        ...prev,
-        profile: {
-          ...prev.profile!,
-          identity: { ...prev.profile!.identity, statusMessage }
-        }
-      }));
+      const updated = {
+        ...state.profile,
+        identity: { ...state.profile.identity, statusMessage }
+      };
+      setState(prev => ({ ...prev, profile: updated }));
+      syncProfileUpdate(updated, { statusMessage });
     }
   };
 
   const handleUpdateIcon = (icon: string) => {
     if (state.profile) {
-      setState(prev => ({
-        ...prev,
-        profile: {
-          ...prev.profile!,
-          identity: { ...prev.profile!.identity, icon }
-        }
-      }));
+      const updated = {
+        ...state.profile,
+        identity: { ...state.profile.identity, icon }
+      };
+      setState(prev => ({ ...prev, profile: updated }));
+      syncProfileUpdate(updated, { icon });
     }
   };
 
@@ -237,11 +247,17 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, currentStep: 'MAIN' }));
   };
 
-  const handleWipeSession = () => {
+  const handleWipeSession = async () => {
+    if (state.profile) {
+      try {
+        await FirestoreService.deleteSession(state.profile.id);
+      } catch (e) {
+        console.error("Failed to delete session on logout", e);
+      }
+    }
     signOut(auth).catch((error) => {
       console.error("Error signing out:", error);
     });
-    // State update checks in useEffect will handle the rest
   };
 
   return (
