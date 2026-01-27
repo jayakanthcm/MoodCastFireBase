@@ -634,10 +634,27 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
                 <p className="text-[8px] font-bold text-slate-600 mt-2">Adjust tuning or preferences in "Tune" tab</p>
               </div>
             ) : filteredRadarUsers.map((user) => (
-              <div key={user.id} className="flex flex-col gap-4 p-6 glass rounded-[2.5rem] border-indigo-500/5 hover:border-indigo-500/20 transition-all">
+              <div
+                key={user.id}
+                className={`relative flex flex-col gap-4 p-6 glass rounded-[2.5rem] border hover:border-indigo-500/40 transition-all cursor-pointer group/card ${likedUserIds.has(user.id) ? 'border-pink-500/40 bg-pink-500/5' : 'border-indigo-500/5'}`}
+                onClick={(e) => {
+                  // Prevent triggering if clicking specific inner buttons
+                  if ((e.target as HTMLElement).closest('button')) return;
+                  toggleInterest(user.id, e);
+                }}
+              >
+                {/* Visual "Pulse Sent" Indicator Overlay */}
+                {likedUserIds.has(user.id) && (
+                  <div className="absolute top-4 right-4 pointer-events-none animate-pulse">
+                    <div className="bg-pink-500 text-white text-[10px] font-black uppercase px-2 py-1 rounded-full shadow-lg tracking-widest">
+                      PULSED
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex justify-between items-start">
                   <div>
-                    <h4 className="text-xl font-black text-white tracking-tight leading-none mb-1">{user.nickname}</h4>
+                    <h4 className="text-xl font-black text-white tracking-tight leading-none mb-1 group-hover/card:text-indigo-300 transition-colors">{user.nickname}</h4>
                     <p className="text-[10px] font-black text-indigo-400 mb-2 uppercase tracking-wide">
                       {user.gender.charAt(0)} | {user.ageRange} | {user.status}
                     </p>
@@ -650,25 +667,35 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
                 </div>
                 <div className="flex items-center justify-between mt-2 pt-4 border-t border-white/5">
                   <div className="flex gap-4 items-center">
-                    <div className="flex items-center gap-2 text-[10px] font-black text-pink-500/60">
-                      <PulseIcon className="w-4 h-4" />
-                      {user.stats.interested}
+                    <div className="flex items-center gap-1.5 text-pink-500">
+                      <PulseIcon className="w-5 h-5" />
+                      <span className="text-sm font-black">{user.stats.interested}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] font-black text-cyan-500/60">
-                      <RadarIcon className="w-4 h-4" />
-                      {user.stats.inRadar}
+                    <div className="flex items-center gap-1.5 text-cyan-500">
+                      <RadarIcon className="w-5 h-5" />
+                      <span className="text-sm font-black">{user.stats.inRadar}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={(e) => toggleInterest(user.id, e)}
+                      onClick={(e) => {
+                        e.stopPropagation(); // Handle separately
+                        toggleInterest(user.id, e);
+                      }}
                       aria-label={likedUserIds.has(user.id) ? "Unlike User" : "Like User"}
-                      className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${likedUserIds.has(user.id) ? 'bg-pink-500 text-white shadow-lg shadow-pink-500/30' : 'bg-white/5 text-slate-500 hover:text-pink-400'}`}
+                      className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all active:scale-90 ${likedUserIds.has(user.id) ? 'bg-pink-500 text-white shadow-lg shadow-pink-500/30 ring-2 ring-pink-500/50' : 'bg-white/5 text-slate-500 hover:text-pink-400 hover:bg-white/10'}`}
                     >
-                      <PulseIcon className="w-5 h-5" />
+                      <PulseIcon className="w-6 h-6" />
                     </button>
-                    <button onClick={() => openChat(user.id)} aria-label="Open Chat" className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center hover:bg-indigo-500 hover:text-white transition-all shadow-sm">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openChat(user.id);
+                      }}
+                      aria-label="Open Chat"
+                      className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center hover:bg-indigo-500 hover:text-white transition-all shadow-sm active:scale-90"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
                     </button>
                   </div>
                 </div>
@@ -766,161 +793,164 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
             </div>
           )}
         </div>
-      )}
+      )
+      }
 
-      {activeTab === 'CONTROLS' && (
-        <div className="flex-1 flex flex-col pt-4 overflow-y-auto hide-scrollbar pb-32">
-          <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-600 mb-8 px-2">Aura Control Center</h2>
-          <div className="space-y-6 px-2">
+      {
+        activeTab === 'CONTROLS' && (
+          <div className="flex-1 flex flex-col pt-4 overflow-y-auto hide-scrollbar pb-32">
+            <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-600 mb-8 px-2">Aura Control Center</h2>
+            <div className="space-y-6 px-2">
 
-            {/* Radar Tuning Section */}
-            <div className="glass p-7 rounded-[2.5rem] border-white/5 space-y-8">
-              <div className="flex items-center gap-3">
-                <RadarIcon className="w-5 h-5 text-indigo-400" />
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Radar Tuning</label>
-              </div>
+              {/* Radar Tuning Section */}
+              <div className="glass p-7 rounded-[2.5rem] border-white/5 space-y-8">
+                <div className="flex items-center gap-3">
+                  <RadarIcon className="w-5 h-5 text-indigo-400" />
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Radar Tuning</label>
+                </div>
 
-              <div className="space-y-6">
-                <div>
-                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-3 px-1">Scan Radius (Distance)</label>
-                  <div className="relative">
-                    <select
-                      value={scanRange}
-                      aria-label="Select Scan Range"
-                      onChange={(e) => setScanRange(Number(e.target.value))}
-                      className="w-full bg-slate-900 border border-white/10 rounded-2xl p-4 text-xs font-bold text-slate-200 appearance-none outline-none focus:border-indigo-500 transition-all shadow-inner"
-                    >
-                      <option value={25}>25 Meters (Internal / Ultra Local)</option>
-                      <option value={50}>50 Meters (Cafe / Bar Scale)</option>
-                      <option value={100}>100 Meters (Block Scale)</option>
-                      <option value={150}>150 Meters (Immediate Vicinity)</option>
-                      <option value={200}>200 Meters (Max Discovery)</option>
-                    </select>
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-600">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                <div className="space-y-6">
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-3 px-1">Scan Radius (Distance)</label>
+                    <div className="relative">
+                      <select
+                        value={scanRange}
+                        aria-label="Select Scan Range"
+                        onChange={(e) => setScanRange(Number(e.target.value))}
+                        className="w-full bg-slate-900 border border-white/10 rounded-2xl p-4 text-xs font-bold text-slate-200 appearance-none outline-none focus:border-indigo-500 transition-all shadow-inner"
+                      >
+                        <option value={25}>25 Meters (Internal / Ultra Local)</option>
+                        <option value={50}>50 Meters (Cafe / Bar Scale)</option>
+                        <option value={100}>100 Meters (Block Scale)</option>
+                        <option value={150}>150 Meters (Immediate Vicinity)</option>
+                        <option value={200}>200 Meters (Max Discovery)</option>
+                      </select>
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-600">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div>
-                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-3 px-1">Vibe Frequency (BPM)</label>
-                  <div className="flex items-center gap-4">
-                    <input
-                      type="range"
-                      min="40"
-                      max="180"
-                      step="5"
-                      aria-label="Pulse BPM Slider"
-                      value={pulseBPM}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        setPulseBPM(val);
-                        if (isBroadcasting) updateBroadcastData({ pulseBPM: val });
-                      }}
-                      className="flex-1 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                    />
-                    <span className="text-xs font-mono font-bold text-indigo-400 w-12 text-right">{pulseBPM}</span>
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-3 px-1">Vibe Frequency (BPM)</label>
+                    <div className="flex items-center gap-4">
+                      <input
+                        type="range"
+                        min="40"
+                        max="180"
+                        step="5"
+                        aria-label="Pulse BPM Slider"
+                        value={pulseBPM}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setPulseBPM(val);
+                          if (isBroadcasting) updateBroadcastData({ pulseBPM: val });
+                        }}
+                        className="flex-1 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                      />
+                      <span className="text-xs font-mono font-bold text-indigo-400 w-12 text-right">{pulseBPM}</span>
+                    </div>
                   </div>
-                </div>
 
-                <div>
-                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-3 px-1">Aura Color</label>
-                  <div className="flex items-center gap-4">
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-3 px-1">Aura Color</label>
+                    <div className="flex items-center gap-4">
+                      <input
+                        type="color"
+                        value={vibeColor}
+                        aria-label="Vibe Color Picker"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setVibeColor(val);
+                          if (isBroadcasting) updateBroadcastData({ vibeColor: val });
+                        }}
+                        className="w-10 h-10 rounded-xl border-none cursor-pointer bg-transparent"
+                      />
+                      <span className="text-xs font-mono text-slate-500 uppercase">{vibeColor}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-3 px-1">Vibe Soundtrack (YouTube Link)</label>
                     <input
-                      type="color"
-                      value={vibeColor}
-                      aria-label="Vibe Color Picker"
+                      type="text"
+                      placeholder="Check the pulse with a song..."
+                      aria-label="YouTube Soundtrack URL"
+                      value={youtubeUrl}
                       onChange={(e) => {
                         const val = e.target.value;
-                        setVibeColor(val);
-                        if (isBroadcasting) updateBroadcastData({ vibeColor: val });
+                        setYoutubeUrl(val);
+                        if (isBroadcasting) updateBroadcastData({ youtubeUrl: val });
                       }}
-                      className="w-10 h-10 rounded-xl border-none cursor-pointer bg-transparent"
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:border-indigo-500 placeholder:text-slate-700"
                     />
-                    <span className="text-xs font-mono text-slate-500 uppercase">{vibeColor}</span>
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-3 px-1">Signal Filter (Who to Scan)</label>
+                    <div className="relative">
+                      <select
+                        value={visibilityLevel}
+                        aria-label="Select Visibility Filter"
+                        onChange={(e) => setVisibilityLevel(e.target.value as 'ALL' | 'PREFS')}
+                        className="w-full bg-slate-900 border border-white/10 rounded-2xl p-4 text-xs font-bold text-slate-200 appearance-none outline-none focus:border-indigo-500 transition-all shadow-inner"
+                      >
+                        <option value="ALL">Show All Nearby Signals (Unfiltered)</option>
+                        <option value="PREFS">Match My Preference Logic (Mutual Only)</option>
+                      </select>
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-600">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                      </div>
+                    </div>
+                    <p className="text-[8px] text-slate-600 mt-2 px-1 font-bold italic leading-tight uppercase">
+                      Note: "Mutual Only" ensures privacy and safety by only showing you to people you want to see, and vice-versa.
+                    </p>
                   </div>
                 </div>
+              </div>
 
-                <div>
-                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-3 px-1">Vibe Soundtrack (YouTube Link)</label>
-                  <input
-                    type="text"
-                    placeholder="Check the pulse with a song..."
-                    aria-label="YouTube Soundtrack URL"
-                    value={youtubeUrl}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setYoutubeUrl(val);
-                      if (isBroadcasting) updateBroadcastData({ youtubeUrl: val });
-                    }}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:border-indigo-500 placeholder:text-slate-700"
-                  />
+              <div className="glass p-7 rounded-[2.5rem] border-white/5 relative overflow-hidden group">
+                <div className="absolute -right-4 -top-4 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-all" />
+                <div className="flex justify-between items-center mb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl">👻</span>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Stealth Pulse</label>
+                  </div>
+                  <button onClick={() => toggleBroadcasting(!isBroadcasting)} aria-label="Toggle Stealth Mode" className={`w-14 h-7 rounded-full relative transition-all shadow-inner ${isBroadcasting ? 'bg-indigo-600' : 'bg-slate-800'}`}>
+                    <div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all shadow-md ${isBroadcasting ? 'left-8' : 'left-1'}`} />
+                  </button>
                 </div>
+                <p className="text-[10px] text-slate-500 font-medium leading-relaxed italic pr-12">"Your presence remains invisible until you toggle this switch ON."</p>
+              </div>
 
-                <div>
-                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-3 px-1">Signal Filter (Who to Scan)</label>
-                  <div className="relative">
-                    <select
-                      value={visibilityLevel}
-                      aria-label="Select Visibility Filter"
-                      onChange={(e) => setVisibilityLevel(e.target.value as 'ALL' | 'PREFS')}
-                      className="w-full bg-slate-900 border border-white/10 rounded-2xl p-4 text-xs font-bold text-slate-200 appearance-none outline-none focus:border-indigo-500 transition-all shadow-inner"
-                    >
-                      <option value="ALL">Show All Nearby Signals (Unfiltered)</option>
-                      <option value="PREFS">Match My Preference Logic (Mutual Only)</option>
-                    </select>
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-600">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+              <div className="pt-2">
+                <button
+                  onClick={onEditProfile}
+                  className="w-full flex items-center justify-between p-7 glass rounded-[2.5rem] border-indigo-500/10 hover:border-indigo-500/30 transition-all group"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                    </div>
+                    <div className="text-left">
+                      <span className="block text-[10px] font-black text-indigo-400 uppercase tracking-widest leading-none mb-1">Aura Identity</span>
+                      <span className="text-sm font-bold text-white">Refine Profile Aura</span>
                     </div>
                   </div>
-                  <p className="text-[8px] text-slate-600 mt-2 px-1 font-bold italic leading-tight uppercase">
-                    Note: "Mutual Only" ensures privacy and safety by only showing you to people you want to see, and vice-versa.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="glass p-7 rounded-[2.5rem] border-white/5 relative overflow-hidden group">
-              <div className="absolute -right-4 -top-4 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-all" />
-              <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">👻</span>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Stealth Pulse</label>
-                </div>
-                <button onClick={() => toggleBroadcasting(!isBroadcasting)} aria-label="Toggle Stealth Mode" className={`w-14 h-7 rounded-full relative transition-all shadow-inner ${isBroadcasting ? 'bg-indigo-600' : 'bg-slate-800'}`}>
-                  <div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all shadow-md ${isBroadcasting ? 'left-8' : 'left-1'}`} />
+                  <svg className="w-5 h-5 text-slate-600 group-hover:text-indigo-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg>
                 </button>
               </div>
-              <p className="text-[10px] text-slate-500 font-medium leading-relaxed italic pr-12">"Your presence remains invisible until you toggle this switch ON."</p>
-            </div>
 
-            <div className="pt-2">
               <button
-                onClick={onEditProfile}
-                className="w-full flex items-center justify-between p-7 glass rounded-[2.5rem] border-indigo-500/10 hover:border-indigo-500/30 transition-all group"
+                onClick={onWipeSession}
+                className="w-full mt-8 text-[10px] font-black text-red-500/60 uppercase tracking-widest py-6 border border-red-500/10 rounded-[2.5rem] hover:bg-red-500/5 transition-all"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-400">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                  </div>
-                  <div className="text-left">
-                    <span className="block text-[10px] font-black text-indigo-400 uppercase tracking-widest leading-none mb-1">Aura Identity</span>
-                    <span className="text-sm font-bold text-white">Refine Profile Aura</span>
-                  </div>
-                </div>
-                <svg className="w-5 h-5 text-slate-600 group-hover:text-indigo-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" /></svg>
+                WIPE AURA SESSION
               </button>
             </div>
-
-            <button
-              onClick={onWipeSession}
-              className="w-full mt-8 text-[10px] font-black text-red-500/60 uppercase tracking-widest py-6 border border-red-500/10 rounded-[2.5rem] hover:bg-red-500/5 transition-all"
-            >
-              WIPE AURA SESSION
-            </button>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Persistent Navigation */}
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md p-6 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent pointer-events-none z-50">
@@ -964,6 +994,6 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
           SIGNAL: {isBroadcasting ? "LIVE" : "OFF (STEALTH)"}
         </span>
       </div>
-    </div>
+    </div >
   );
 };
