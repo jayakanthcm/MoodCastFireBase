@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@google/genai": "^1.38.0",
+    "@google/generative-ai": "^0.24.1",
     "firebase": "^12.8.0",
     "geofire-common": "^6.0.0",
     "react": "^19.2.3",

@@ -1,4 +1,8 @@
 import { UserProfile, ChatMessage } from "../types";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const genAI = API_KEY && API_KEY !== 'PLACEHOLDER_API_KEY' ? new GoogleGenerativeAI(API_KEY) : null;
 
 const VIBE_TAGLINES = [
   "Sipping coffee & judging fonts",
@@ -61,7 +65,19 @@ const DEFAULT_RESPONSES = [
 ];
 
 export const generateVibeTagline = async (profile: UserProfile): Promise<string> => {
-  // Simulate network delay for realism
+  if (genAI) {
+    try {
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const prompt = `Write a short, poetic 1-line social status for a ${profile.identity.ageRange} ${profile.identity.gender} whose mood is ${profile.mood}. Max 6 words.`;
+      const result = await model.generateContent(prompt);
+      const response = result.response;
+      return response.text().trim();
+    } catch (error) {
+      console.warn("Gemini API failed, falling back to mock:", error);
+    }
+  }
+
+  // Simulate network delay for realism if mock
   await new Promise(resolve => setTimeout(resolve, 800));
   const randomTag = VIBE_TAGLINES[Math.floor(Math.random() * VIBE_TAGLINES.length)];
   return randomTag;
