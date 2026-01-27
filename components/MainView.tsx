@@ -4,6 +4,8 @@ import { UserProfile, MoodType, ChatThread, ChatMessage, AuraSession, LiveAura }
 import { MOODS } from '../constants';
 import { generateVibeTagline } from '../services/geminiService';
 import { FirestoreService } from '../services/firestoreService';
+import { useLocation } from '../hooks/useLocation';
+import { useRadar } from '../hooks/useRadar';
 
 interface Props {
   profile: UserProfile;
@@ -13,25 +15,6 @@ interface Props {
   onUpdateIcon: (icon: string) => void;
   onEditProfile: () => void;
   onWipeSession: () => void;
-}
-
-// Helper: Calculate Distance
-function getDistanceFromLatLonInM(lat1: number, lon1: number, lat2: number, lon2: number) {
-  var R = 6371; // Radius of the earth in km
-  var dLat = deg2rad(lat2 - lat1);
-  var dLon = deg2rad(lon2 - lon1);
-  var a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2)
-    ;
-  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  var d = R * c; // Distance in km
-  return Math.round(d * 1000);
-}
-
-function deg2rad(deg: number) {
-  return deg * (Math.PI / 180)
 }
 
 const Stamp: React.FC<{ text: string; color: string; rotation: string; highlight?: boolean }> = ({ text, color, rotation, highlight }) => (
@@ -76,9 +59,23 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
   const [tempStatus, setTempStatus] = useState(profile.identity.statusMessage);
 
   // Real-Time Data State
-  const [nearbyUsers, setNearbyUsers] = useState<(AuraSession & { id: string, dist: number })[]>([]);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
-  const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number } | null>(null);
+  const [scanRange, setScanRange] = useState<number>(5000);
+  const [visibilityLevel, setVisibilityLevel] = useState<'ALL' | 'PREFS'>('ALL');
+
+  // Custom Hooks
+  const { currentLocation, error: locationError } = useLocation();
+  const nearbyUsers = useRadar(profile.id, currentLocation, scanRange, isBroadcasting);
+
+  // Sync Location
+  useEffect(() => {
+    if (isBroadcasting && currentLocation) {
+      FirestoreService.updateSession(profile.id, {
+        lat: currentLocation.lat,
+        lng: currentLocation.lng,
+      });
+    }
+  }, [currentLocation, isBroadcasting, profile.id]);
 
   // Ephemeral Vibe State
   const [vibeColor, setVibeColor] = useState('#6366f1');
@@ -100,11 +97,6 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
   const [likedUserIds, setLikedUserIds] = useState<Set<string>>(new Set());
   const [liveStats, setLiveStats] = useState({ interested: 0, inRadar: 0 });
 
-  // Settings State
-  const [visibilityLevel, setVisibilityLevel] = useState<'ALL' | 'PREFS'>('ALL'); // Default to ALL for better discovery
-  const [scanRange, setScanRange] = useState<number>(5000); // Default to 5km for testing
-  // const [isGhostMode, setIsGhostMode] = useState(false); // REPLACED by !isBroadcasting
-
   // Initial Location Fetch & Radar Subscription
   useEffect(() => {
     // Cleanup on window close
@@ -118,28 +110,7 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isBroadcasting, profile.id]);
 
-  // Location Tracking & Radar Subscription
-  useEffect(() => {
-    let watchId: number;
 
-    if (navigator.geolocation) {
-      watchId = navigator.geolocation.watchPosition((pos) => {
-        const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setCurrentLocation(newLoc);
-        if (isBroadcasting) {
-          updateBroadcastData(newLoc);
-        }
-      }, (err) => {
-        console.error("Location access denied", err);
-      }, {
-        enableHighAccuracy: true
-      });
-    }
-
-    return () => {
-      if (watchId) navigator.geolocation.clearWatch(watchId);
-    };
-  }, [isBroadcasting]);
 
   // Real-Time Stats Subscription (Fix for Static Data)
   useEffect(() => {
@@ -154,51 +125,9 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
     return () => unsubscribe();
   }, [isBroadcasting, profile.id]);
 
-  // 2. Subscribe to Radar (Geohash Query)
-  useEffect(() => {
-    if (!currentLocation) return;
 
-    const unsubscribe = FirestoreService.subscribeToRadar(
-      [currentLocation.lat, currentLocation.lng],
-      scanRange,
-      (sessions) => {
-        // [DEBUG] Log raw session count
-        console.log("Raw sessions from Firestore:", sessions.length);
 
-        // Filter by Recency (Last 10 minutes)
-        const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
 
-        const mapped = sessions
-          .map(s => {
-            // Handle Timestamp or number (legacy)
-            const lastSeenTime = s.lastSeen?.toMillis ? s.lastSeen.toMillis() : (s.lastSeen || 0);
-            if (lastSeenTime < tenMinutesAgo) return null; // Filter stale
-
-            const dist = getDistanceFromLatLonInM(currentLocation.lat, currentLocation.lng, s.lat, s.lng);
-            return { ...s, id: s.uid, dist };
-          })
-          .filter((s): s is (LiveAura & { id: string, dist: number }) => s !== null && s.id !== profile.id)
-          .filter(s => s.dist <= scanRange); // Apply Distance Filter
-
-        setNearbyUsers(mapped);
-
-        // Self-Reporting 'On Radar' Count (Vibe Coding Feature)
-        // We calculate how many people are near US, and publish it so others can see on our stamp.
-        if (isBroadcasting) {
-          const mySession = sessions.find(s => s.uid === profile.id);
-          const currentCount = mySession?.stats?.inRadar || 0;
-          const newCount = mapped.length;
-
-          if (currentCount !== newCount) {
-            console.log(`[Radar] Updating my On-Radar count: ${currentCount} -> ${newCount}`);
-            FirestoreService.updateInRadarCount(profile.id, newCount);
-          }
-        }
-      }
-    );
-
-    return () => unsubscribe();
-  }, [currentLocation, scanRange]);
 
 
 
@@ -285,36 +214,33 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
 
   const toggleBroadcasting = async (shouldBroadcast: boolean) => {
     if (shouldBroadcast) {
-      if (!navigator.geolocation) {
-        alert("Geolocation is required to broadcast.");
+      if (!currentLocation) {
+        alert("Acquiring GPS signal... please wait.");
         return;
       }
-      navigator.geolocation.getCurrentPosition(async (pos) => {
-        setCurrentLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
 
-        const session: AuraSession = {
-          uid: profile.id,
-          nickname: profile.identity.nickname,
-          icon: profile.identity.icon,
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          mood: profile.mood,
-          statusMessage: profile.identity.statusMessage,
-          ageRange: profile.identity.ageRange,
-          gender: profile.identity.gender,
-          status: profile.identity.status,
-          seeking: profile.seeking,
-          stats: profile.identity.stats,
-          lastSeen: null, // Set by server
-          geohash: '', // Set by server utils
-          vibeColor: vibeColor,
-          pulseBPM: pulseBPM,
-          youtubeUrl: youtubeUrl
-        };
+      const session: AuraSession = {
+        uid: profile.id,
+        nickname: profile.identity.nickname,
+        icon: profile.identity.icon,
+        lat: currentLocation.lat,
+        lng: currentLocation.lng,
+        mood: profile.mood,
+        statusMessage: profile.identity.statusMessage,
+        ageRange: profile.identity.ageRange,
+        gender: profile.identity.gender,
+        status: profile.identity.status,
+        seeking: profile.seeking,
+        stats: profile.identity.stats,
+        lastSeen: null, // Set by server
+        geohash: '', // Set by server utils
+        vibeColor: vibeColor,
+        pulseBPM: pulseBPM,
+        youtubeUrl: youtubeUrl
+      };
 
-        await FirestoreService.createSession(session);
-        setIsBroadcasting(true);
-      });
+      await FirestoreService.createSession(session);
+      setIsBroadcasting(true);
     } else {
       await FirestoreService.deleteSession(profile.id);
       setIsBroadcasting(false);

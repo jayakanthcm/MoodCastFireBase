@@ -4,10 +4,10 @@ import { Gender, RelationshipStatus, MoodType, AgeRange } from './types';
 export const GENDERS: Gender[] = ['Male', 'Female', 'Non-binary', 'Other'];
 export const REL_STATUS: RelationshipStatus[] = ['Single', 'Married', 'Divorced', 'Widowed', 'Complicated'];
 export const MOODS: MoodType[] = [
-  'Cozy', 
-  'Solo dolo', 
-  'Rizzing', 
-  'Freaky', 
+  'Cozy',
+  'Solo dolo',
+  'Rizzing',
+  'Freaky',
   'Sendy'
 ];
 
@@ -21,88 +21,106 @@ export const AGE_BRACKETS: AgeRange[] = [
 ];
 
 export const MOCK_NEARBY_USERS = [
-  { 
-    id: '1', 
-    nickname: 'VelvetSky', 
-    gender: 'Female', 
-    ageRange: '18-25', 
-    status: 'Single', 
-    mood: 'Cozy', 
-    dist: 15, 
-    statusMessage: 'Looking for someone to talk about stars with.', 
+  {
+    id: '1',
+    nickname: 'VelvetSky',
+    gender: 'Female',
+    ageRange: '18-25',
+    status: 'Single',
+    mood: 'Cozy',
+    dist: 15,
+    statusMessage: 'Looking for someone to talk about stars with.',
     seeking: { gender: 'Male', ageRange: '18-25', status: 'Single' },
-    stats: { interested: 5, inRadar: 2 } 
+    stats: { interested: 5, inRadar: 2 }
   },
-  { 
-    id: '2', 
-    nickname: 'NeoBiker', 
-    gender: 'Male', 
-    ageRange: '25-35', 
-    status: 'Single', 
-    mood: 'Freaky', 
-    dist: 120, 
-    statusMessage: 'Just here for a wild ride.', 
+  {
+    id: '2',
+    nickname: 'NeoBiker',
+    gender: 'Male',
+    ageRange: '25-35',
+    status: 'Single',
+    mood: 'Freaky',
+    dist: 120,
+    statusMessage: 'Just here for a wild ride.',
     seeking: { gender: 'Female', ageRange: '25-35', status: 'Single' },
-    stats: { interested: 12, inRadar: 8 } 
+    stats: { interested: 12, inRadar: 8 }
   },
-  { 
-    id: '3', 
-    nickname: 'PixelPixie', 
-    gender: 'Female', 
-    ageRange: '18-25', 
-    status: 'Single', 
-    mood: 'Rizzing', 
-    dist: 80, 
-    statusMessage: 'Tell me your secrets and I will tell you mine.', 
+  {
+    id: '3',
+    nickname: 'PixelPixie',
+    gender: 'Female',
+    ageRange: '18-25',
+    status: 'Single',
+    mood: 'Rizzing',
+    dist: 80,
+    statusMessage: 'Tell me your secrets and I will tell you mine.',
     seeking: { gender: 'Everyone', ageRange: '18-25', status: 'Single' },
-    stats: { interested: 3, inRadar: 1 } 
+    stats: { interested: 3, inRadar: 1 }
   },
-  { 
-    id: '4', 
-    nickname: 'SolarWind', 
-    gender: 'Other', 
-    ageRange: '25-35', 
-    status: 'Complicated', 
-    mood: 'Solo dolo', 
-    dist: 210, 
-    statusMessage: 'Exploring the city, one coffee at a time.', 
+  {
+    id: '4',
+    nickname: 'SolarWind',
+    gender: 'Other',
+    ageRange: '25-35',
+    status: 'Complicated',
+    mood: 'Solo dolo',
+    dist: 210,
+    statusMessage: 'Exploring the city, one coffee at a time.',
     seeking: { gender: 'Everyone', ageRange: '25-35', status: 'Single' },
-    stats: { interested: 1, inRadar: 4 } 
+    stats: { interested: 1, inRadar: 4 }
   },
-  { 
-    id: '5', 
-    nickname: 'QuietStorm', 
-    gender: 'Female', 
-    ageRange: '35-45', 
-    status: 'Married', 
-    mood: 'Cozy', 
-    dist: 350, 
-    statusMessage: 'Peace of mind over everything.', 
+  {
+    id: '5',
+    nickname: 'QuietStorm',
+    gender: 'Female',
+    ageRange: '35-45',
+    status: 'Married',
+    mood: 'Cozy',
+    dist: 350,
+    statusMessage: 'Peace of mind over everything.',
     seeking: { gender: 'Female', ageRange: '35-45', status: 'Married' },
-    stats: { interested: 0, inRadar: 0 } 
+    stats: { interested: 0, inRadar: 0 }
   },
-  { 
-    id: '6', 
-    nickname: 'Ace', 
-    gender: 'Male', 
-    ageRange: '18-25', 
-    status: 'Single', 
-    mood: 'Freaky', 
-    dist: 15, 
-    statusMessage: 'Let us see where the night takes us.', 
+  {
+    id: '6',
+    nickname: 'Ace',
+    gender: 'Male',
+    ageRange: '18-25',
+    status: 'Single',
+    mood: 'Freaky',
+    dist: 15,
+    statusMessage: 'Let us see where the night takes us.',
     seeking: { gender: 'Everyone', ageRange: '18-25', status: 'Single' },
-    stats: { interested: 24, inRadar: 12 } 
+    stats: { interested: 24, inRadar: 12 }
   },
-  { 
-    id: '7', 
-    nickname: 'Luna', 
-    gender: 'Female', 
-    ageRange: '18-25', 
-    status: 'Single', 
-    mood: 'Sendy', 
-    dist: 90, 
-    statusMessage: 'Seeking a partner in crime for brunch.', 
+  {
+    id: '7',
+    nickname: 'Luna',
+    gender: 'Female',
+    ageRange: '18-25',
+    status: 'Single',
+    mood: 'Sendy',
+    dist: 90,
+    statusMessage: 'Seeking a partner in crime for brunch.',
     seeking: { gender: 'Everyone', ageRange: '18-25', status: 'Single' },
-    stats: { interested: 7, inRadar: 3 } 
+    stats: { interested: 7, inRadar: 3 }
   },
 ];
+
+export function getDistanceFromLatLonInM(lat1: number, lon1: number, lat2: number, lon2: number) {
+  var R = 6371; // Radius of the earth in km
+  var dLat = deg2rad(lat2 - lat1);
+  var dLon = deg2rad(lon2 - lon1);
+  var a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2)
+    ;
+  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  var d = R * c; // Distance in km
+  return Math.round(d * 1000);
+}
+
+function deg2rad(deg: number) {
+  return deg * (Math.PI / 180)
+}
