@@ -116,9 +116,22 @@ export const FirestoreService = {
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const sessions = snapshot.docs.map(doc => doc.data() as LiveAura);
-            console.log(`[Radar] Fetched ${sessions.length} sessions from Firestore.`);
-            callback(sessions);
+            const allSessions = snapshot.docs.map(doc => doc.data() as LiveAura);
+
+            // Calculate who is actually in range
+            const nearbySessions = allSessions.filter(session => {
+                // Ensure session has lat/lng
+                if (!session.lat || !session.lng) return false;
+
+                const distanceInKm = geofire.distanceBetween(
+                    [center[0], center[1]],
+                    [session.lat, session.lng]
+                );
+                return distanceInKm * 1000 <= radiusInMeters;
+            });
+
+            console.log(`[Radar] Fetched ${allSessions.length}, Filtered to ${nearbySessions.length} nearby.`);
+            callback(nearbySessions);
         });
 
         return unsubscribe;

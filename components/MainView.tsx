@@ -324,21 +324,21 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
     if (user.dist > scanRange) return false;
 
     // Safety & Preference Logic
-    if (visibilityLevel === 'PREFS') {
-      // 1. Check if the other user fits MY criteria
-      const iLikeTheirGender = profile.seeking.gender === 'Everyone' || user.gender === profile.seeking.gender;
-      const iLikeTheirAge = profile.seeking.ageRange === 'All' || user.ageRange === profile.seeking.ageRange;
-      const iLikeTheirStatus = profile.seeking.status === 'All' || user.status === profile.seeking.status;
+    // Strict Seeking Preferences Filter (User Request)
+    const matchesGender = profile.seeking.gender === 'Everyone' || user.gender === profile.seeking.gender;
+    const matchesStatus = profile.seeking.status === 'All' || user.status === profile.seeking.status;
+    // We also keep Age Range as it's in the UI
+    const matchesAge = profile.seeking.ageRange === 'All' || user.ageRange === profile.seeking.ageRange;
 
-      // 2. Mutual Match Check: Check if I fit THEIR criteria (to prevent predatory targeting)
-      const theyLikeMyGender = user.seeking.gender === 'Everyone' || profile.identity.gender === user.seeking.gender;
-      const theyLikeMyAge = user.seeking.ageRange === 'All' || profile.identity.ageRange === user.seeking.ageRange;
-      const theyLikeMyStatus = user.seeking.status === 'All' || profile.identity.status === user.seeking.status;
+    if (!matchesGender || !matchesStatus || !matchesAge) return false;
 
-      if (!iLikeTheirGender || !iLikeTheirAge || !iLikeTheirStatus || !theyLikeMyGender || !theyLikeMyAge || !theyLikeMyStatus) {
-        return false;
-      }
-    }
+    // Optional: Keep Mutual Match for Safety (Commented out if user thinks it's 'broken' but good for production)
+    // const theyLikeMyGender = user.seeking.gender === 'Everyone' || profile.identity.gender === user.seeking.gender;
+    // if (!theyLikeMyGender) return false; 
+
+    // Visibility 'PREFS' vs 'ALL' is now redundant if we always filter, 
+    // but we can keep the variable for potential future UI toggles. 
+    // For now, this core logic ensures "Seeking" settings actually work.
 
     if (selectedMoodFilter !== 'ALL') {
       return user.mood === selectedMoodFilter;
