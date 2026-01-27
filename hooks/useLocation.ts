@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { FirestoreService } from '../services/firestoreService';
 
-export const useLocation = () => {
+export const useLocation = (userId: string, isBroadcasting: boolean) => {
     const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
     const [error, setError] = useState<GeolocationPositionError | null>(null);
 
@@ -12,20 +13,32 @@ export const useLocation = () => {
 
         const watchId = navigator.geolocation.watchPosition(
             (pos) => {
-                setCurrentLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                setCurrentLocation(newLoc);
                 setError(null);
+
+                // Reactive Update: Sync to Firestore if broadcasting
+                if (isBroadcasting && userId) {
+                    FirestoreService.updateSession(userId, {
+                        lat: newLoc.lat,
+                        lng: newLoc.lng,
+                        // lastSeen is automatically handled by updateSession, but we can be explicit if needed
+                        // Service.updateSession adds serverTimestamp() to lastSeen
+                    });
+                }
             },
             (err) => {
                 console.error("Location access denied", err);
                 setError(err);
             },
             {
-                enableHighAccuracy: true
+                enableHighAccuracy: true,
+                distanceFilter: 5 // Teaching Point: Update every 5 meters
             }
         );
 
         return () => navigator.geolocation.clearWatch(watchId);
-    }, []);
+    }, [userId, isBroadcasting]);
 
     return { currentLocation, error };
 };

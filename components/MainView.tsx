@@ -64,18 +64,11 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
   const [visibilityLevel, setVisibilityLevel] = useState<'ALL' | 'PREFS'>('ALL');
 
   // Custom Hooks
-  const { currentLocation, error: locationError } = useLocation();
+  const { currentLocation, error: locationError } = useLocation(profile.id, isBroadcasting);
   const nearbyUsers = useRadar(profile.id, currentLocation, scanRange, isBroadcasting);
 
-  // Sync Location
-  useEffect(() => {
-    if (isBroadcasting && currentLocation) {
-      FirestoreService.updateSession(profile.id, {
-        lat: currentLocation.lat,
-        lng: currentLocation.lng,
-      });
-    }
-  }, [currentLocation, isBroadcasting, profile.id]);
+  // Sync Location handled by useLocation hook now.
+
 
   // Ephemeral Vibe State
   const [vibeColor, setVibeColor] = useState('#6366f1');

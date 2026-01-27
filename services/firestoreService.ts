@@ -182,9 +182,13 @@ export const FirestoreService = {
     },
 
     subscribeToConversations(userId: string, callback: (conversations: any[]) => void): () => void {
+        // Ephemeral Logic: Only subscribe to conversations active in last 12 hours
+        const twelveHoursAgo = Date.now() - 12 * 60 * 60 * 1000;
+
         const q = query(
             collection(db, CONVERSATIONS_COLLECTION),
-            where('participants', 'array-contains', userId)
+            where('participants', 'array-contains', userId),
+            where('lastUpdated', '>', twelveHoursAgo)
         );
         return onSnapshot(q, (snapshot) => {
             const conversations = snapshot.docs.map(doc => ({
