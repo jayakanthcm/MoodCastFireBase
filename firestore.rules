@@ -20,11 +20,12 @@ service cloud.firestore {
     }
 
     // 2. Live Auras (Presence System)
-    // - Everyone can read (Public Radar) to find people
-    // - Only the owner can write (Heartbeat/Profile)
     match /live_auras/{userId} {
       allow read: if isAuthenticated();
-      allow write: if isOwner(userId);
+      // Owner can do anything (Create, Update, Delete)
+      allow create, delete: if isOwner(userId);
+      // Update: Owner can update anything. Others can only update 'stats' (Pins).
+      allow update: if isOwner(userId) || (isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stats']));
     }
 
     // 3. Conversations (Chat Metadata)
