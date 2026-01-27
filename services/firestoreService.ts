@@ -123,6 +123,18 @@ export const FirestoreService = {
         return unsubscribe;
     },
 
+    // Subscribe to a specific session (for self-monitoring stats like "interested")
+    subscribeToSession(uid: string, callback: (session: LiveAura | null) => void): () => void {
+        const ref = doc(db, SESSIONS_COLLECTION, uid);
+        return onSnapshot(ref, (snap) => {
+            if (snap.exists()) {
+                callback(snap.data() as LiveAura);
+            } else {
+                callback(null);
+            }
+        });
+    },
+
     // --- Chat Methods ---
 
     async sendMessage(recipientId: string, text: string, senderId: string): Promise<void> {

@@ -98,13 +98,26 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
 
   // Interaction State
   const [likedUserIds, setLikedUserIds] = useState<Set<string>>(new Set());
+  const [liveStats, setLiveStats] = useState({ interested: 0, inRadar: 0 });
 
   // Settings State
-  const [visibilityLevel, setVisibilityLevel] = useState<'ALL' | 'PREFS'>('PREFS'); // Default to PREFS for safety
-  const [scanRange, setScanRange] = useState<number>(100);
+  const [visibilityLevel, setVisibilityLevel] = useState<'ALL' | 'PREFS'>('ALL'); // Default to ALL for better discovery
+  const [scanRange, setScanRange] = useState<number>(5000); // Default to 5km for testing
   // const [isGhostMode, setIsGhostMode] = useState(false); // REPLACED by !isBroadcasting
 
   // Initial Location Fetch & Radar Subscription
+  useEffect(() => {
+    // Cleanup on window close
+    const handleBeforeUnload = () => {
+      if (isBroadcasting) {
+        // Attempt to delete session (navigator.sendBeacon is better but Firestore sync works too if fast)
+        FirestoreService.deleteSession(profile.id);
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isBroadcasting, profile.id]);
+
   // Location Tracking & Radar Subscription
   useEffect(() => {
     let watchId: number;
@@ -130,6 +143,7 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
       }, (err) => {
         console.error("Location access denied", err);
       }, {
+        enableHighAccuracy: true
       });
     }
 
@@ -232,6 +246,29 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
       }, 180000); // 3 minutes
     }
     return () => clearInterval(interval);
+  }, [isBroadcasting, profile.id]);
+
+  // Auto-Start Broadcasting on Mount (Default to Live)
+  useEffect(() => {
+    // Check if we already have permission or just try to start
+    // We want the default state to be "Available"
+    if (!isBroadcasting) {
+      toggleBroadcasting(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
+
+  // Real-time Session Stats Subscription
+  useEffect(() => {
+    if (!isBroadcasting) return;
+
+    // Subscribe to my own session to get real-time stats (interested count, etc)
+    const unsub = FirestoreService.subscribeToSession(profile.id, (session) => {
+      if (session && session.stats) {
+        setLiveStats(session.stats);
+      }
+    });
+    return () => unsub();
   }, [isBroadcasting, profile.id]);
 
   const toggleBroadcasting = async (shouldBroadcast: boolean) => {
@@ -397,6 +434,9 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
       <div className="flex items-center justify-between mb-6 px-2 shrink-0">
         <div className="flex items-center gap-3">
           <div className={`w-2.5 h-2.5 rounded-full ${isGhostMode ? 'bg-slate-600' : 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)] animate-pulse'}`} />
+
+          <div className="h-4 w-[1px] bg-white/10 mx-1" />
+
           <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
             {profile.identity.nickname || "GHOST"} <span className="text-slate-700 mx-2">/</span> <span className="text-indigo-400">{profile.mood}</span>
           </span>
@@ -409,131 +449,156 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
       {activeTab === 'AURA' && (
         <div className="flex-1 overflow-y-auto hide-scrollbar pb-32">
           <div className="mb-6">
-            <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-600 mb-6">Aura Configuration</h2>
+            <div className="mb-6 space-y-4">
+              {/* Status Toggle Card */}
+              <div
+                onClick={() => toggleBroadcasting(!isBroadcasting)}
+                className={`p-6 rounded-[2rem] border transition-all cursor-pointer relative overflow-hidden group ${isBroadcasting ? 'bg-emerald-900/20 border-emerald-500/30 hover:bg-emerald-900/30' : 'bg-slate-900/50 border-white/5 hover:border-white/10'}`}
+              >
+                <div className={`absolute top-0 right-0 p-32 rounded-full blur-[60px] transition-all duration-700 ${isBroadcasting ? 'bg-emerald-500/10' : 'bg-slate-500/5'}`} />
 
-            <div className="glass p-8 rounded-[3rem] border-white/10 relative overflow-hidden group shadow-2xl">
-              <div className="absolute -right-4 -top-4 w-48 h-48 bg-indigo-500/10 rounded-full blur-[80px]" />
+                <div className="relative flex items-center justify-between">
+                  <div>
+                    <h3 className={`text-xl font-black uppercase tracking-tight mb-1 ${isBroadcasting ? 'text-white' : 'text-slate-400'}`}>
+                      {isBroadcasting ? 'Broadcasting Live' : 'Stealth Mode'}
+                    </h3>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                      {isBroadcasting ? 'Visible to nearby auras' : 'You are hidden from radar'}
+                    </p>
+                  </div>
 
-              <div className="flex justify-between items-start mb-8">
-                <div className="space-y-6 flex-1 pr-4">
-                  <div className="mb-4">
-                    {isEditingNickname ? (
-                      <input
+                  <div className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 ${isBroadcasting ? 'bg-emerald-500' : 'bg-slate-700'}`}>
+                    <div className={`w-6 h-6 rounded-full bg-white shadow-lg transform transition-transform duration-300 ${isBroadcasting ? 'translate-x-6' : 'translate-x-0'}`} />
+                  </div>
+                </div>
+              </div>
+
+              <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-600 mb-2 mt-8 px-2">Aura Configuration</h2>
+
+              <div className="glass p-8 rounded-[3rem] border-white/10 relative overflow-hidden group shadow-2xl">
+                <div className="absolute -right-4 -top-4 w-48 h-48 bg-indigo-500/10 rounded-full blur-[80px]" />
+
+                <div className="flex justify-between items-start mb-8">
+                  <div className="space-y-6 flex-1 pr-4">
+                    <div className="mb-4">
+                      {isEditingNickname ? (
+                        <input
+                          autoFocus
+                          type="text"
+                          aria-label="Edit Nickname"
+                          className="bg-slate-900 border border-indigo-500/50 rounded-xl px-3 py-2 text-lg font-bold text-white outline-none w-full"
+                          value={tempNickname}
+                          onChange={(e) => setTempNickname(e.target.value)}
+                          onBlur={saveNickname}
+                          onKeyDown={(e) => e.key === 'Enter' && saveNickname()}
+                        />
+                      ) : (
+                        <div className="flex items-center gap-3 group/nick cursor-pointer" onClick={() => setIsEditingNickname(true)}>
+                          <h3 className="text-3xl font-black text-white tracking-tight leading-none">{profile.identity.nickname || "Set Nickname..."}</h3>
+                          <svg className="w-4 h-4 text-slate-600 opacity-0 group-hover/nick:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Stamp text={`${profile.identity.gender.charAt(0)} | ${profile.identity.ageRange} | ${profile.identity.status}`} color="text-indigo-400" rotation="-rotate-1" />
+                      <Stamp text={profile.mood} color="text-emerald-400" rotation="rotate-1" highlight />
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => isBroadcasting && fileInputRef.current?.click()}
+                    className={`w-20 h-20 rounded-3xl bg-slate-900 border border-white/10 flex items-center justify-center relative shadow-inner overflow-hidden shrink-0 transition-all ${isBroadcasting ? 'cursor-pointer hover:border-indigo-500/50 hover:scale-105 active:scale-95 group/icon-main' : 'opacity-50'}`}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-transparent" />
+                    {!isBroadcasting ? <span className="text-4xl grayscale opacity-50">👻</span> : renderIcon(profile.identity.icon)}
+                    {isBroadcasting && (
+                      <div className="absolute inset-0 bg-indigo-600/20 opacity-0 group-hover/icon-main:opacity-100 flex items-center justify-center transition-opacity z-20">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                      </div>
+                    )}
+                    <input type="file" ref={fileInputRef} onChange={handleIconFileChange} className="hidden" accept="image/*" aria-label="Upload Profile Icon" />
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="relative group/status cursor-pointer border-l-2 border-indigo-500/30 pl-4 mb-4">
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Active Pulse Status</label>
+                    {isEditingStatus ? (
+                      <textarea
                         autoFocus
-                        type="text"
-                        aria-label="Edit Nickname"
-                        className="bg-slate-900 border border-indigo-500/50 rounded-xl px-3 py-2 text-lg font-bold text-white outline-none w-full"
-                        value={tempNickname}
-                        onChange={(e) => setTempNickname(e.target.value)}
-                        onBlur={saveNickname}
-                        onKeyDown={(e) => e.key === 'Enter' && saveNickname()}
+                        rows={3}
+                        aria-label="Edit Status Message"
+                        className="bg-slate-900 border border-indigo-500/50 rounded-xl p-3 text-sm font-medium italic text-indigo-400/90 outline-none w-full resize-none leading-relaxed"
+                        value={tempStatus}
+                        onChange={(e) => setTempStatus(e.target.value)}
+                        onBlur={saveStatus}
+                        onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && saveStatus()}
                       />
                     ) : (
-                      <div className="flex items-center gap-3 group/nick cursor-pointer" onClick={() => setIsEditingNickname(true)}>
-                        <h3 className="text-3xl font-black text-white tracking-tight leading-none">{profile.identity.nickname || "Set Nickname..."}</h3>
-                        <svg className="w-4 h-4 text-slate-600 opacity-0 group-hover/nick:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                        </svg>
+                      <div className="flex items-start justify-between gap-4" onClick={() => setIsEditingStatus(true)}>
+                        <p className={`text-sm font-medium italic leading-relaxed transition-opacity ${isRegenerating ? 'opacity-30' : 'text-indigo-400/90'}`}>
+                          "{profile.identity.statusMessage || "Pulse a secret status..."}"
+                        </p>
+                        <button
+                          onClick={handleManualRegenerate}
+                          disabled={isRegenerating}
+                          aria-label="Regenerate Status"
+                          title="Regenerate Status"
+                          className="p-1.5 rounded-lg hover:bg-white/5 transition-colors opacity-0 group-hover/status:opacity-100"
+                        >
+                          <svg className={`w-4 h-4 text-indigo-400/60 ${isRegenerating ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                        </button>
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Stamp text={`${profile.identity.gender.charAt(0)} | ${profile.identity.ageRange} | ${profile.identity.status}`} color="text-indigo-400" rotation="-rotate-1" />
-                    <Stamp text={profile.mood} color="text-emerald-400" rotation="rotate-1" highlight />
+
+                  <div className="flex items-center gap-8 pl-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-500">
+                        <PulseIcon className="w-4.5 h-4.5" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black text-pink-500/70 uppercase tracking-tighter leading-none mb-1">Aura Pings</span>
+                        <span className="text-lg font-black text-white leading-none">{isBroadcasting ? liveStats.interested : profile.identity.stats.interested}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-500">
+                        <RadarIcon className="w-4.5 h-4.5" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black text-cyan-500/70 uppercase tracking-tighter leading-none mb-1">On Radar</span>
+                        <span className="text-lg font-black text-white leading-none">{isBroadcasting ? liveStats.inRadar : profile.identity.stats.inRadar}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div
-                  onClick={() => isBroadcasting && fileInputRef.current?.click()}
-                  className={`w-20 h-20 rounded-3xl bg-slate-900 border border-white/10 flex items-center justify-center relative shadow-inner overflow-hidden shrink-0 transition-all ${isBroadcasting ? 'cursor-pointer hover:border-indigo-500/50 hover:scale-105 active:scale-95 group/icon-main' : 'opacity-50'}`}
-                >
-                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-transparent" />
-                  {!isBroadcasting ? <span className="text-4xl grayscale opacity-50">👻</span> : renderIcon(profile.identity.icon)}
-                  {isBroadcasting && (
-                    <div className="absolute inset-0 bg-indigo-600/20 opacity-0 group-hover/icon-main:opacity-100 flex items-center justify-center transition-opacity z-20">
-                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                    </div>
-                  )}
-                  <input type="file" ref={fileInputRef} onChange={handleIconFileChange} className="hidden" accept="image/*" aria-label="Upload Profile Icon" />
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                <div className="relative group/status cursor-pointer border-l-2 border-indigo-500/30 pl-4 mb-4">
-                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Active Pulse Status</label>
-                  {isEditingStatus ? (
-                    <textarea
-                      autoFocus
-                      rows={3}
-                      aria-label="Edit Status Message"
-                      className="bg-slate-900 border border-indigo-500/50 rounded-xl p-3 text-sm font-medium italic text-indigo-400/90 outline-none w-full resize-none leading-relaxed"
-                      value={tempStatus}
-                      onChange={(e) => setTempStatus(e.target.value)}
-                      onBlur={saveStatus}
-                      onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && saveStatus()}
-                    />
-                  ) : (
-                    <div className="flex items-start justify-between gap-4" onClick={() => setIsEditingStatus(true)}>
-                      <p className={`text-sm font-medium italic leading-relaxed transition-opacity ${isRegenerating ? 'opacity-30' : 'text-indigo-400/90'}`}>
-                        "{profile.identity.statusMessage || "Pulse a secret status..."}"
-                      </p>
-                      <button
-                        onClick={handleManualRegenerate}
-                        disabled={isRegenerating}
-                        aria-label="Regenerate Status"
-                        title="Regenerate Status"
-                        className="p-1.5 rounded-lg hover:bg-white/5 transition-colors opacity-0 group-hover/status:opacity-100"
-                      >
-                        <svg className={`w-4 h-4 text-indigo-400/60 ${isRegenerating ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-8 pl-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-500">
-                      <PulseIcon className="w-4.5 h-4.5" />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-black text-pink-500/70 uppercase tracking-tighter leading-none mb-1">Aura Pings</span>
-                      <span className="text-lg font-black text-white leading-none">{profile.identity.stats.interested}</span>
-                    </div>
+                <div className="pt-6 mt-8 border-t border-white/5">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-4 px-1 flex items-center gap-2">
+                    <span className={`w-1.5 h-1.5 rounded-full ${isBroadcasting ? 'bg-indigo-500 animate-pulse' : 'bg-slate-700'}`} />
+                    Mood Broadcast
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={profile.mood}
+                      aria-label="Broadcast Mood"
+                      onChange={(e) => {
+                        const m = e.target.value as MoodType;
+                        onUpdateMood(m);
+                        if (isBroadcasting) updateBroadcastData({ mood: m });
+                        else toggleBroadcasting(true); // Auto-start broadcast on mood select
+                      }}
+                      className="w-full bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl text-sm font-black p-4 pr-12 appearance-none outline-none focus:ring-2 focus:ring-indigo-500/40 text-slate-100 cursor-pointer transition-all hover:bg-slate-900/80 shadow-inner"
+                    >
+                      {MOODS.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
                   </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-500">
-                      <RadarIcon className="w-4.5 h-4.5" />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-black text-cyan-500/70 uppercase tracking-tighter leading-none mb-1">On Radar</span>
-                      <span className="text-lg font-black text-white leading-none">{profile.identity.stats.inRadar}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-6 mt-8 border-t border-white/5">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-4 px-1 flex items-center gap-2">
-                  <span className={`w-1.5 h-1.5 rounded-full ${isBroadcasting ? 'bg-indigo-500 animate-pulse' : 'bg-slate-700'}`} />
-                  Mood Broadcast
-                </label>
-                <div className="relative">
-                  <select
-                    value={profile.mood}
-                    aria-label="Broadcast Mood"
-                    onChange={(e) => {
-                      const m = e.target.value as MoodType;
-                      onUpdateMood(m);
-                      if (isBroadcasting) updateBroadcastData({ mood: m });
-                      else toggleBroadcasting(true); // Auto-start broadcast on mood select
-                    }}
-                    className="w-full bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl text-sm font-black p-4 pr-12 appearance-none outline-none focus:ring-2 focus:ring-indigo-500/40 text-slate-100 cursor-pointer transition-all hover:bg-slate-900/80 shadow-inner"
-                  >
-                    {MOODS.map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
                 </div>
               </div>
             </div>
@@ -624,29 +689,35 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
                     <p className="text-slate-600 text-[10px] font-black uppercase tracking-[0.2em]">No signals intercepted</p>
                   </div>
                 ) : (
-                  conversations.map(conv => {
-                    const otherUid = conv.participants.find((p: string) => p !== profile.id);
-                    const user = nearbyUsers.find(u => u.id === otherUid);
-                    // If user is not nearby, they might be offline. 
-                    const isOutOfRange = !user || user.dist > scanRange;
+                  conversations
+                    .filter(conv => {
+                      // Ephemeral Chat Logic: Hide chats inactive for > 12 hours
+                      const twelveHoursAgo = Date.now() - 12 * 60 * 60 * 1000;
+                      return conv.lastUpdated > twelveHoursAgo;
+                    })
+                    .map(conv => {
+                      const otherUid = conv.participants.find((p: string) => p !== profile.id);
+                      const user = nearbyUsers.find(u => u.id === otherUid);
+                      // If user is not nearby, they might be offline. 
+                      const isOutOfRange = !user || user.dist > scanRange;
 
-                    return (
-                      <div key={conv.id} onClick={() => setActiveChatUserId(otherUid)} className={`glass p-5 rounded-3xl flex items-center gap-4 cursor-pointer hover:bg-white/5 transition-all ${!user ? 'opacity-50 grayscale' : ''}`}>
-                        <div className="w-12 h-12 rounded-xl bg-slate-900 border border-white/5 flex items-center justify-center text-xl shrink-0">
-                          {user?.icon ? renderIcon(user.icon) : '👤'}
-                        </div>
-                        <div className="flex-1 overflow-hidden">
-                          <div className="flex justify-between items-center mb-1">
-                            <h4 className="font-black text-sm text-white">{user?.nickname || 'Offline Signal'}</h4>
-                            <span className={`text-[8px] font-mono uppercase tracking-tighter ${!user ? 'text-slate-500' : 'text-emerald-500'}`}>
-                              {!user ? 'OFFLINE' : (isOutOfRange ? 'Beyond Radar' : 'Pulsing')}
-                            </span>
+                      return (
+                        <div key={conv.id} onClick={() => setActiveChatUserId(otherUid)} className={`glass p-5 rounded-3xl flex items-center gap-4 cursor-pointer hover:bg-white/5 transition-all ${!user ? 'opacity-50 grayscale' : ''}`}>
+                          <div className="w-12 h-12 rounded-xl bg-slate-900 border border-white/5 flex items-center justify-center text-xl shrink-0">
+                            {user?.icon ? renderIcon(user.icon) : '👤'}
                           </div>
-                          <p className="text-xs text-slate-400 truncate font-medium italic">"{conv.lastMessage || 'Encrypted signal...'}"</p>
+                          <div className="flex-1 overflow-hidden">
+                            <div className="flex justify-between items-center mb-1">
+                              <h4 className="font-black text-sm text-white">{user?.nickname || 'Offline Signal'}</h4>
+                              <span className={`text-[8px] font-mono uppercase tracking-tighter ${!user ? 'text-slate-500' : 'text-emerald-500'}`}>
+                                {!user ? 'OFFLINE' : (isOutOfRange ? 'Beyond Radar' : 'Pulsing')}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400 truncate font-medium italic">"{conv.lastMessage || 'Encrypted signal...'}"</p>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })
+                      );
+                    })
                 )}
               </div>
             </div>
@@ -885,10 +956,13 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
       </div>
 
       {/* DEBUG FOOTER (Temporary) */}
-      <div className="fixed bottom-0 left-0 w-full bg-black/80 text-[10px] text-green-400 font-mono p-1 z-50 pointer-events-none flex justify-between px-4">
+      <div className="fixed bottom-0 left-0 w-full bg-black/90 text-[10px] text-green-400 font-mono p-1 z-50 pointer-events-none flex justify-between px-2 flex-wrap">
         <span>LOC: {currentLocation ? `${currentLocation.lat.toFixed(4)}, ${currentLocation.lng.toFixed(4)}` : 'WAITING'}</span>
         <span>RANGE: {scanRange}m</span>
         <span>NEARBY: {nearbyUsers.length}</span>
+        <span className={isBroadcasting ? "text-green-400" : "text-red-500"}>
+          SIGNAL: {isBroadcasting ? "LIVE" : "OFF (STEALTH)"}
+        </span>
       </div>
     </div>
   );
