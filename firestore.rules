@@ -1,0 +1,43 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+  
+    // Helper function to check auth
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // 1. Users Collection
+    // - Everyone authenticated can read profiles (needed for Radar/Chat UI lookup)
+    // - Only the user can write their own profile
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+    }
+
+    // 2. Live Auras (Presence System)
+    // - Everyone can read (Public Radar) to find people
+    // - Only the owner can write (Heartbeat/Profile)
+    match /live_auras/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+    }
+
+    // 3. Conversations (Chat Metadata)
+    // - Participants can read/write their conversations
+    match /conversations/{conversationId} {
+      // For MVP/Demo simplicity, allowing all authenticated users to create/read
+      // In production, checking 'request.auth.uid in resource.data.participants' is better
+      allow read, write: if isAuthenticated();
+      
+      // 4. Messages (Sub-collection)
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+  }
+}

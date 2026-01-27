@@ -1,0 +1,7 @@
+{
+  "name": "Aura - Local Vibes",
+  "description": "A privacy-focused local social app to connect with people nearby based on your current mood. Simple, text-stamp profiles for safe and quick interactions.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
