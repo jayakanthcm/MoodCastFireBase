@@ -656,9 +656,9 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
                 ) : (
                   conversations
                     .filter(conv => {
-                      // Ephemeral Chat Logic: Hide chats inactive for > 12 hours
-                      const twelveHoursAgo = Date.now() - 12 * 60 * 60 * 1000;
-                      return conv.lastUpdated > twelveHoursAgo;
+                      // Vibe Persistence: Chat visible ONLY if user is currently nearby and active.
+                      const otherUid = conv.participants.find((p: string) => p !== profile.id);
+                      return nearbyUsers.some(u => u.id === otherUid);
                     })
                     .map(conv => {
                       const otherUid = conv.participants.find((p: string) => p !== profile.id);
