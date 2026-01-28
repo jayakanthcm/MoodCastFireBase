@@ -338,17 +338,26 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
 
   const toggleInterest = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setLikedUserIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
+    if (likedUserIds.has(id)) {
+      // Prevent negative stats if count is already 0
+      const currentUser = nearbyUsers.find(u => u.id === id);
+      const currentInterested = currentUser?.stats?.interested || 0;
+
+      setLikedUserIds(prev => {
+        const next = new Set(prev);
         next.delete(id);
-        FirestoreService.updateInterest(id, -1);
-      } else {
+        return next;
+      });
+      // Only decrement if greater than 0
+      FirestoreService.updateInterest(id, currentInterested > 0 ? -1 : 0);
+    } else {
+      setLikedUserIds(prev => {
+        const next = new Set(prev);
         next.add(id);
-        FirestoreService.updateInterest(id, 1);
-      }
-      return next;
-    });
+        return next;
+      });
+      FirestoreService.updateInterest(id, 1);
+    }
   };
 
   const handleWipeSessionWrap = async () => {
@@ -584,14 +593,21 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
                 )}
 
                 <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="text-xl font-black text-white tracking-tight leading-none mb-1 group-hover/card:text-indigo-300 transition-colors">{user.nickname}</h4>
-                    <p className="text-[10px] font-black text-indigo-400 mb-2 uppercase tracking-wide">
-                      {user.gender.charAt(0)} | {user.ageRange} | {user.status}
-                    </p>
-                    <p className="text-[11px] font-medium text-slate-400 italic leading-relaxed">"{user.statusMessage}"</p>
+                  <div className="flex gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-slate-900 border border-white/5 flex items-center justify-center shrink-0">
+                      {renderIcon(user.icon)}
+                    </div>
+                    <div>
+                      <h4 className="text-xl font-black text-white tracking-tight leading-none mb-1 group-hover/card:text-indigo-300 transition-colors">{user.nickname}</h4>
+                      <p className="text-[10px] font-black text-indigo-400 mb-2 uppercase tracking-wide">
+                        {user.gender.charAt(0)} | {user.ageRange} | {user.status}
+                      </p>
+                      <p className="text-[11px] font-medium text-slate-400 italic leading-relaxed">"{user.statusMessage}"</p>
+                    </div>
                   </div>
-                  <span className="text-[10px] font-black text-slate-600 font-mono bg-slate-900/80 px-2 py-1 rounded-lg border border-white/5">{user.dist}M</span>
+                  <span className="text-[10px] font-black text-slate-600 font-mono bg-slate-900/80 px-2 py-1 rounded-lg border border-white/5 h-fit">
+                    {user.dist}M
+                  </span>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Stamp text={user.mood} color="text-emerald-400" rotation="-rotate-1" highlight />
@@ -750,11 +766,10 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
                         onChange={(e) => setScanRange(Number(e.target.value))}
                         className="w-full bg-slate-900 border border-white/10 rounded-2xl p-4 text-xs font-bold text-slate-200 appearance-none outline-none focus:border-indigo-500 transition-all shadow-inner"
                       >
-                        <option value={25}>25 Meters (Internal / Ultra Local)</option>
-                        <option value={50}>50 Meters (Cafe / Bar Scale)</option>
-                        <option value={100}>100 Meters (Block Scale)</option>
-                        <option value={150}>150 Meters (Immediate Vicinity)</option>
-                        <option value={200}>200 Meters (Max Discovery)</option>
+                        <option value={500}>500 Meters (Neighborhood)</option>
+                        <option value={1000}>1 Kilometer (City Block)</option>
+                        <option value={5000}>5 Kilometers (Full City)</option>
+                        <option value={10000}>10 Kilometers (Regional)</option>
                       </select>
                       <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-600">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>

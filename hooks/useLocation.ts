@@ -34,7 +34,7 @@ export const useLocation = (userId: string, isBroadcasting: boolean) => {
             {
                 enableHighAccuracy: true,
                 distanceFilter: 5 // Teaching Point: Update every 5 meters
-            }
+            } as any
         );
 
         return () => navigator.geolocation.clearWatch(watchId);
