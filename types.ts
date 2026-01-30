@@ -77,6 +77,7 @@ export interface LiveAura {
   stats: {
     interested: number; // Replcaes pins
     inRadar: number;
+    pulsedBy?: string[]; // Array of UIDs who have pulsed this user
   };
   lastSeen: any; // Firestore Timestamp
 }

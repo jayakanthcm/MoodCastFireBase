@@ -16,7 +16,9 @@ import {
     increment,
     startAt,
     endAt,
-    limit
+    limit,
+    arrayUnion,
+    arrayRemove
 } from 'firebase/firestore';
 import { UserProfile, LiveAura, ChatMessage } from '../types';
 import * as geofire from 'geofire-common';
@@ -99,11 +101,19 @@ export const FirestoreService = {
         await deleteDoc(doc(db, SESSIONS_COLLECTION, uid));
     },
 
-    async updateInterest(targetUid: string, delta: number): Promise<void> {
+    async togglePulse(targetUid: string, senderUid: string, isAdding: boolean): Promise<void> {
         const ref = doc(db, SESSIONS_COLLECTION, targetUid);
-        await updateDoc(ref, {
-            'stats.interested': increment(delta)
-        });
+        if (isAdding) {
+            await updateDoc(ref, {
+                'stats.interested': increment(1),
+                'stats.pulsedBy': arrayUnion(senderUid)
+            });
+        } else {
+            await updateDoc(ref, {
+                'stats.interested': increment(-1),
+                'stats.pulsedBy': arrayRemove(senderUid)
+            });
+        }
     },
 
     async updateInRadarCount(uid: string, count: number): Promise<void> {
@@ -182,7 +192,7 @@ export const FirestoreService = {
     },
 
     subscribeToConversations(userId: string, callback: (conversations: any[]) => void): () => void {
-        const ephemeralThreshold = Date.now() - (12 * 60 * 60 * 1000); // 12 Hours
+        const ephemeralThreshold = Date.now() - (2 * 60 * 60 * 1000); // 2 Hours
         const q = query(
             collection(db, CONVERSATIONS_COLLECTION),
             where('participants', 'array-contains', userId),

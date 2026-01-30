@@ -89,6 +89,7 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
   // Interaction State
   const [likedUserIds, setLikedUserIds] = useState<Set<string>>(new Set());
   const [liveStats, setLiveStats] = useState({ interested: 0, inRadar: 0 });
+  const [myLiveSession, setMyLiveSession] = useState<LiveAura | null>(null);
 
   // Initial Location Fetch & Radar Subscription
   useEffect(() => {
@@ -110,6 +111,7 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
     if (!isBroadcasting) return;
 
     const unsubscribe = FirestoreService.subscribeToSession(profile.id, (session) => {
+      setMyLiveSession(session);
       if (session && session.stats) {
         setLiveStats(session.stats);
       }
@@ -208,7 +210,8 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
   const toggleBroadcasting = async (shouldBroadcast: boolean) => {
     if (shouldBroadcast) {
       if (!currentLocation) {
-        alert("Acquiring GPS signal... please wait.");
+        // alert("Acquiring GPS signal... please wait."); 
+        console.log("Waiting for GPS...");
         return;
       }
 
@@ -338,26 +341,17 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
 
   const toggleInterest = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (likedUserIds.has(id)) {
-      // Prevent negative stats if count is already 0
-      const currentUser = nearbyUsers.find(u => u.id === id);
-      const currentInterested = currentUser?.stats?.interested || 0;
-
-      setLikedUserIds(prev => {
-        const next = new Set(prev);
+    setLikedUserIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
         next.delete(id);
-        return next;
-      });
-      // Only decrement if greater than 0
-      FirestoreService.updateInterest(id, currentInterested > 0 ? -1 : 0);
-    } else {
-      setLikedUserIds(prev => {
-        const next = new Set(prev);
+        FirestoreService.togglePulse(id, profile.id, false);
+      } else {
         next.add(id);
-        return next;
-      });
-      FirestoreService.updateInterest(id, 1);
-    }
+        FirestoreService.togglePulse(id, profile.id, true);
+      }
+      return next;
+    });
   };
 
   const handleWipeSessionWrap = async () => {
@@ -576,42 +570,54 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
             ) : filteredRadarUsers.map((user) => (
               <div
                 key={user.id}
-                className={`relative flex flex-col gap-4 p-6 glass rounded-[2.5rem] border hover:border-indigo-500/40 transition-all cursor-pointer group/card ${likedUserIds.has(user.id) ? 'border-pink-500/40 bg-pink-500/5' : 'border-indigo-500/5'}`}
-                onClick={(e) => {
-                  // Prevent triggering if clicking specific inner buttons
-                  if ((e.target as HTMLElement).closest('button')) return;
-                  toggleInterest(user.id, e);
-                }}
+                className={`relative flex flex-col gap-4 p-6 glass rounded-[2.5rem] border hover:border-indigo-500/40 transition-all group/card ${likedUserIds.has(user.id) ? 'border-pink-500/40 bg-pink-500/5' : 'border-indigo-500/5'} ${/* Mutual Vibe Highlight */ (myLiveSession?.stats?.pulsedBy?.includes(user.id) && likedUserIds.has(user.id)) ? 'shadow-[0_0_30px_rgba(236,72,153,0.15)]' : ''}`}
               >
                 {/* Visual "Pulse Sent" Indicator Overlay */}
                 {likedUserIds.has(user.id) && (
-                  <div className="absolute top-4 right-4 pointer-events-none animate-pulse">
+                  <div className="absolute top-4 right-4 pointer-events-none animate-pulse z-50">
                     <div className="bg-pink-500 text-white text-[10px] font-black uppercase px-2 py-1 rounded-full shadow-lg tracking-widest">
-                      PULSED
+                      {myLiveSession?.stats?.pulsedBy?.includes(user.id) ? "MUTUAL VIBE" : "SENT"}
                     </div>
                   </div>
                 )}
 
                 <div className="flex justify-between items-start">
                   <div className="flex gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-slate-900 border border-white/5 flex items-center justify-center shrink-0">
+                    <div className="w-12 h-12 rounded-xl bg-slate-900 border border-white/5 flex items-center justify-center shrink-0 overflow-hidden shadow-inner relative">
+                      {/* Who Pulsed Me Indicator on Avatar */}
+                      {myLiveSession?.stats?.pulsedBy?.includes(user.id) && !likedUserIds.has(user.id) && (
+                        <div className="absolute inset-0 border-2 border-pink-500 rounded-xl z-20 animate-pulse shadow-[inset_0_0_10px_rgba(236,72,153,0.5)]"></div>
+                      )}
                       {renderIcon(user.icon)}
                     </div>
                     <div>
-                      <h4 className="text-xl font-black text-white tracking-tight leading-none mb-1 group-hover/card:text-indigo-300 transition-colors">{user.nickname}</h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xl font-black text-white tracking-tight leading-none mb-1 group-hover/card:text-indigo-300 transition-colors">{user.nickname}</h4>
+                        {/* Visible Badge for "Pulsed You" */}
+                        {myLiveSession?.stats?.pulsedBy?.includes(user.id) && !likedUserIds.has(user.id) && (
+                          <span className="bg-pink-500 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow-lg tracking-widest animate-bounce">
+                            PULSED YOU!
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[10px] font-black text-indigo-400 mb-2 uppercase tracking-wide">
                         {user.gender.charAt(0)} | {user.ageRange} | {user.status}
                       </p>
                       <p className="text-[11px] font-medium text-slate-400 italic leading-relaxed">"{user.statusMessage}"</p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-black text-slate-600 font-mono bg-slate-900/80 px-2 py-1 rounded-lg border border-white/5 h-fit">
-                    {user.dist}M
-                  </span>
+                  <div className="flex flex-col items-end gap-2 z-10 relative">
+                    {/* Redundant SENT badge removed */}
+                    <span className="text-[10px] font-black text-slate-600 font-mono bg-slate-900/80 px-2 py-1 rounded-lg border border-white/5 inline-block">
+                      {user.dist}M
+                    </span>
+                  </div>
                 </div>
+
                 <div className="flex flex-wrap gap-2">
                   <Stamp text={user.mood} color="text-emerald-400" rotation="-rotate-1" highlight />
                 </div>
+
                 <div className="flex items-center justify-between mt-2 pt-4 border-t border-white/5">
                   <div className="flex gap-4 items-center">
                     <div className="flex items-center gap-1.5 text-pink-500">
@@ -626,7 +632,7 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
                   <div className="flex items-center gap-2">
                     <button
                       onClick={(e) => {
-                        e.stopPropagation(); // Handle separately
+                        e.stopPropagation();
                         toggleInterest(user.id, e);
                       }}
                       aria-label={likedUserIds.has(user.id) ? "Unlike User" : "Like User"}
@@ -937,7 +943,7 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
         <span>RANGE: {scanRange}m</span>
         <span>NEARBY: {nearbyUsers.length}</span>
         <span className={isBroadcasting ? "text-green-400" : "text-red-500"}>
-          SIGNAL: {isBroadcasting ? "LIVE" : "OFF (STEALTH)"}
+          SIGNAL: {isBroadcasting ? "LIVE" : "OFF (STEALTH)"} v2.05
         </span>
       </div>
     </div >

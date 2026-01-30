@@ -4,6 +4,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendEmailVerification,
+  sendPasswordResetEmail,
   signOut,
   signInWithPopup
 } from 'firebase/auth';
@@ -20,6 +21,8 @@ export const Onboarding: React.FC<Props> = ({ onComplete, onSignupSuccess }) => 
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isResetMode, setIsResetMode] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,6 +30,13 @@ export const Onboarding: React.FC<Props> = ({ onComplete, onSignupSuccess }) => 
     setLoading(true);
 
     try {
+      if (isResetMode) {
+        await sendPasswordResetEmail(auth, email);
+        setResetSent(true);
+        setLoading(false);
+        return;
+      }
+
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
         // Success handled by App.tsx's onAuthStateChanged
@@ -55,7 +65,7 @@ export const Onboarding: React.FC<Props> = ({ onComplete, onSignupSuccess }) => 
       }
       setError(msg);
     } finally {
-      setLoading(false);
+      if (!isResetMode) setLoading(false);
     }
   };
 
@@ -79,10 +89,12 @@ export const Onboarding: React.FC<Props> = ({ onComplete, onSignupSuccess }) => 
         <span className="text-white text-4xl font-bold">A</span>
       </div>
       <h1 className="text-3xl font-bold mb-4 bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
-        {isLogin ? 'Welcome Back' : 'Join Aura'}
+        {isResetMode ? 'Reset Password' : (isLogin ? 'Welcome Back' : 'Join Aura')}
       </h1>
       <p className="text-slate-400 mb-8">
-        {isLogin ? 'Sign in to pulse your vibe.' : 'Create an account to connect.'}
+        {isResetMode
+          ? 'Enter your email to get back in.'
+          : (isLogin ? 'Sign in to pulse your vibe.' : 'Create an account to connect.')}
       </p>
 
       <form onSubmit={handleSubmit} className="w-full space-y-4 text-left">
@@ -96,16 +108,29 @@ export const Onboarding: React.FC<Props> = ({ onComplete, onSignupSuccess }) => 
             required
           />
         </div>
-        <div>
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500 transition-colors"
-            required
-          />
-        </div>
+        {!isResetMode && (
+          <div>
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500 transition-colors"
+              required
+            />
+            {isLogin && (
+              <div className="flex justify-end mt-2">
+                <button
+                  type="button"
+                  onClick={() => { setIsResetMode(true); setError(null); }}
+                  className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {error && (
           <div className="text-red-400 text-sm font-medium animate-pulse text-center">
@@ -121,9 +146,29 @@ export const Onboarding: React.FC<Props> = ({ onComplete, onSignupSuccess }) => 
             : 'bg-indigo-600 text-white shadow-xl shadow-indigo-500/20 active:scale-95 hover:bg-indigo-500'
             }`}
         >
-          {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Sign Up')}
+          {loading ? 'Processing...' : (isResetMode ? 'Send Reset Link' : (isLogin ? 'Sign In' : 'Sign Up'))}
         </button>
       </form>
+
+      {resetSent && (
+        <div className="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-8 z-50">
+          <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mb-6 animate-bounce">
+            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Check your email</h2>
+          <p className="text-slate-400 mb-8 text-center">
+            We've sent a password reset link to <br /> <span className="text-white font-medium">{email}</span>
+          </p>
+          <button
+            onClick={() => { setIsResetMode(false); setResetSent(false); }}
+            className="text-indigo-400 font-bold hover:text-indigo-300 transition-colors"
+          >
+            Back to Login
+          </button>
+        </div>
+      )}
 
       <div className="relative w-full py-2">
         <div className="absolute inset-0 flex items-center">
@@ -150,12 +195,23 @@ export const Onboarding: React.FC<Props> = ({ onComplete, onSignupSuccess }) => 
       </button>
 
       <div className="mt-8 flex gap-2 text-sm text-slate-400">
-        <span>{isLogin ? "Don't have an account?" : "Already have an account?"}</span>
+        <span>
+          {isResetMode
+            ? "Remember your password?"
+            : (isLogin ? "Don't have an account?" : "Already have an account?")}
+        </span>
         <button
-          onClick={() => { setIsLogin(!isLogin); setError(null); }}
+          onClick={() => {
+            if (isResetMode) {
+              setIsResetMode(false);
+            } else {
+              setIsLogin(!isLogin);
+            }
+            setError(null);
+          }}
           className="text-indigo-400 font-bold hover:text-indigo-300 transition-colors"
         >
-          {isLogin ? 'Sign Up' : 'Sign In'}
+          {isResetMode ? 'Sign In' : (isLogin ? 'Sign Up' : 'Sign In')}
         </button>
       </div>
     </div>
