@@ -20,6 +20,14 @@ export interface ChatThread {
   lastActivity: number;
 }
 
+export interface Conversation {
+  id: string;
+  participants: string[];
+  lastMessage: string;
+  lastSenderId?: string;
+  lastUpdated: number;
+}
+
 export interface UserProfile {
   id: string;
   identity: {
@@ -65,7 +73,7 @@ export interface LiveAura {
   statusMessage: string;
   vibeColor: string;
   pulseBPM: number;
-  youtubeUrl?: string;
+
   ageRange: AgeRange;
   gender: Gender;
   status: RelationshipStatus;

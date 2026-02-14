@@ -85,7 +85,6 @@ export const FirestoreService = {
             ...session,
             geohash: hash,
             lastSeen: serverTimestamp(), // Heartbeat initial start
-            vibeColor: session.vibeColor || '#6366f1', // Default indigo
             pulseBPM: session.pulseBPM || 60
         });
     },
@@ -193,15 +192,17 @@ export const FirestoreService = {
             timestamp: Date.now()
         };
 
-        // Add message
-        await addDoc(messagesRef, messageData);
-
-        // Update conversation metadata (create if doesn't exist)
+        // Update conversation metadata (create if doesn't exist) BEFORE adding message
+        // This ensures the parent document exists so security rules can validate participants
         await setDoc(conversationRef, {
             participants: [senderId, recipientId],
             lastMessage: text,
+            lastSenderId: senderId,
             lastUpdated: Date.now()
         }, { merge: true });
+
+        // Add message
+        await addDoc(messagesRef, messageData);
     },
 
     subscribeToConversations(userId: string, callback: (conversations: any[]) => void): () => void {

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
+import { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { Onboarding } from './components/Onboarding';
 import { Verification } from './components/Verification';
@@ -7,8 +8,9 @@ import { MainView } from './components/MainView';
 import { UserProfile, MoodType, AppState } from './types';
 import { auth } from './services/firebase';
 import { FirestoreService } from './services/firestoreService';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { AdminPanel } from './components/AdminPanel';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 const textInitialState: AppState = {
   isOnboarded: false,
@@ -31,7 +33,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
       if (user) {
         if (!user.emailVerified) {
           // User is logged in but not verified
@@ -147,7 +149,7 @@ const App: React.FC = () => {
   };
 
   const handleBackToLogin = () => {
-    signOut(auth).catch((err) => console.error(err));
+    signOut(auth).catch((err: any) => console.error(err));
     setState(textInitialState);
   };
 
@@ -253,46 +255,48 @@ const App: React.FC = () => {
   const handleWipeSession = async () => {
     // Session is already deleted by handleWipeSessionWrap in MainView before this is called.
     // Just sign out to trigger auth state reset.
-    signOut(auth).catch((error) => {
+    signOut(auth).catch((error: any) => {
       console.error("Error signing out:", error);
     });
   };
 
   return (
     <Layout>
-      {state.currentStep === 'AGREEMENT' && (
-        <Onboarding
-          onComplete={nextStep}
-          onSignupSuccess={handleSignupSuccess}
-        />
-      )}
+      <ErrorBoundary>
+        {state.currentStep === 'AGREEMENT' && (
+          <Onboarding
+            onComplete={nextStep}
+            onSignupSuccess={handleSignupSuccess}
+          />
+        )}
 
-      {state.currentStep === 'VERIFICATION' && (
-        <Verification
-          email={state.unverifiedEmail}
-          onGoToLogin={handleBackToLogin}
-        />
-      )}
+        {state.currentStep === 'VERIFICATION' && (
+          <Verification
+            email={state.unverifiedEmail}
+            onGoToLogin={handleBackToLogin}
+          />
+        )}
 
-      {state.currentStep === 'PROFILE_SETUP' && (
-        <ProfileSetup
-          onSave={handleProfileSave}
-          initialData={state.profile}
-          onCancel={state.profile ? handleCancelEdit : undefined}
-        />
-      )}
+        {state.currentStep === 'PROFILE_SETUP' && (
+          <ProfileSetup
+            onSave={handleProfileSave}
+            initialData={state.profile}
+            onCancel={state.profile ? handleCancelEdit : undefined}
+          />
+        )}
 
-      {state.currentStep === 'MAIN' && state.profile && (
-        <MainView
-          profile={state.profile}
-          onUpdateMood={handleUpdateMood}
-          onUpdateNickname={handleUpdateNickname}
-          onUpdateStatusMessage={handleUpdateStatusMessage}
-          onUpdateIcon={handleUpdateIcon}
-          onEditProfile={handleEditProfileTrigger}
-          onWipeSession={handleWipeSession}
-        />
-      )}
+        {state.currentStep === 'MAIN' && state.profile && (
+          <MainView
+            profile={state.profile}
+            onUpdateMood={handleUpdateMood}
+            onUpdateNickname={handleUpdateNickname}
+            onUpdateStatusMessage={handleUpdateStatusMessage}
+            onUpdateIcon={handleUpdateIcon}
+            onEditProfile={handleEditProfileTrigger}
+            onWipeSession={handleWipeSession}
+          />
+        )}
+      </ErrorBoundary>
     </Layout>
   );
 };

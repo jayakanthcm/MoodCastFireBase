@@ -1,8 +1,4 @@
 import { UserProfile, ChatMessage } from "../types";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const genAI = API_KEY && API_KEY !== 'PLACEHOLDER_API_KEY' ? new GoogleGenerativeAI(API_KEY) : null;
 
 const VIBE_TAGLINES = [
   "Sipping coffee & judging fonts",
@@ -21,7 +17,20 @@ const VIBE_TAGLINES = [
   "Collecting moments, not things",
   "Loading personality...",
   "Currently buffering",
-  "Professional overthinker"
+  "Professional overthinker",
+  "Too glam to give a damn",
+  "Born to express, not to impress",
+  "Making history, one mistake at a time",
+  "Not all those who wander are lost",
+  "Creating my own sunshine",
+  "Life is short, make it sweet",
+  "Dream big, pray bigger",
+  "Hustle and heart set me apart",
+  "Reality calling, I'm not home",
+  "Out of office, mentally",
+  "Living my best life",
+  "Stay wild, moon child",
+  "Energy doesn't lie"
 ];
 
 const CHAT_RESPONSES: Record<string, string[]> = {
@@ -65,20 +74,11 @@ const DEFAULT_RESPONSES = [
 ];
 
 export const generateVibeTagline = async (profile: UserProfile): Promise<string> => {
-  if (genAI) {
-    try {
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const prompt = `Write a short, poetic 1-line social status for a ${profile.identity.ageRange} ${profile.identity.gender} whose mood is ${profile.mood}. Max 6 words.`;
-      const result = await model.generateContent(prompt);
-      const response = result.response;
-      return response.text().trim();
-    } catch (error) {
-      console.warn("Gemini API failed, falling back to mock:", error);
-    }
-  }
+  // Simulate "thinking" delay for realism
+  await new Promise(resolve => setTimeout(resolve, 600));
 
-  // Simulate network delay for realism if mock
-  await new Promise(resolve => setTimeout(resolve, 800));
+  // Simple random selection from static list
+  // In a future update, we could filter this list based on the user's mood/profile if desired
   const randomTag = VIBE_TAGLINES[Math.floor(Math.random() * VIBE_TAGLINES.length)];
   return randomTag;
 };

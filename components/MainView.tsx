@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import * as React from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { resizeImage } from '../services/imageUtils';
-import { UserProfile, MoodType, ChatThread, ChatMessage, AuraSession, LiveAura } from '../types';
+import { UserProfile, MoodType, ChatThread, ChatMessage, AuraSession, LiveAura, Conversation } from '../types';
 import { MOODS } from '../constants';
 import { generateVibeTagline } from '../services/geminiService';
 import { FirestoreService } from '../services/firestoreService';
@@ -73,14 +74,13 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
   // Ephemeral Vibe State
   const [vibeColor, setVibeColor] = useState('#6366f1');
   const [pulseBPM, setPulseBPM] = useState(60);
-  const [youtubeUrl, setYoutubeUrl] = useState('');
 
   // Refs
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Chat State
-  const [conversations, setConversations] = useState<any[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeMessages, setActiveMessages] = useState<ChatMessage[]>([]);
   const [activeChatUserId, setActiveChatUserId] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
@@ -140,13 +140,45 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
     fetchInitialStatus();
   }, [profile.identity.statusMessage]);
 
+  // Request Notification Permission on Mount
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
+
   // Subscribe to Conversations
   useEffect(() => {
     if (!profile.id) return;
     return FirestoreService.subscribeToConversations(profile.id, (convs) => {
+      // Check for new activity to trigger notifications
+      if (conversations.length > 0) {
+        convs.forEach(conv => {
+          const prevConv = conversations.find(c => c.id === conv.id);
+          if (prevConv && conv.lastUpdated > prevConv.lastUpdated) {
+            // New activity detected
+            const isMyMsg = conv.lastSenderId === profile.id;
+            const isActive = activeChatUserId && conv.participants.includes(activeChatUserId);
+
+            if (!isMyMsg && (!isActive || document.hidden)) {
+              // Trigger Notification
+              if ("Notification" in window && Notification.permission === "granted") {
+                const otherUid = conv.participants.find((p: string) => p !== profile.id);
+                const sender = nearbyUsers.find(u => u.id === otherUid);
+                const name = sender?.nickname || "Someone";
+
+                new Notification(`Pulse from ${name}`, {
+                  body: conv.lastMessage || "Sent a signal",
+                  icon: sender?.icon?.startsWith('data:') ? undefined : undefined // Icons can be tricky with data URIs in notifications
+                });
+              }
+            }
+          }
+        });
+      }
       setConversations(convs);
     });
-  }, [profile.id]);
+  }, [profile.id, conversations, activeChatUserId, nearbyUsers]);
 
   // Subscribe to Messages
   useEffect(() => {
@@ -221,7 +253,7 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
         geohash: '', // Set by server utils
         vibeColor: vibeColor,
         pulseBPM: pulseBPM,
-        youtubeUrl: youtubeUrl
+
       };
 
       await FirestoreService.createSession(session);
@@ -671,7 +703,7 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
                       const isOutOfRange = !user || user.dist > scanRange;
 
                       return (
-                        <div key={conv.id} onClick={() => setActiveChatUserId(otherUid)} className={`glass p-5 rounded-3xl flex items-center gap-4 cursor-pointer hover:bg-white/5 transition-all ${!user ? 'opacity-50 grayscale' : ''}`}>
+                        <div key={conv.id} onClick={() => setActiveChatUserId(otherUid || null)} className={`glass p-5 rounded-3xl flex items-center gap-4 cursor-pointer hover:bg-white/5 transition-all ${!user ? 'opacity-50 grayscale' : ''}`}>
                           <div className="w-12 h-12 rounded-xl bg-slate-900 border border-white/5 flex items-center justify-center text-xl shrink-0">
                             {user?.icon ? renderIcon(user.icon) : '👤'}
                           </div>
@@ -811,21 +843,7 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
                     </div>
                   </div>
 
-                  <div>
-                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-3 px-1">Vibe Soundtrack (YouTube Link)</label>
-                    <input
-                      type="text"
-                      placeholder="Check the pulse with a song..."
-                      aria-label="YouTube Soundtrack URL"
-                      value={youtubeUrl}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setYoutubeUrl(val);
-                        if (isBroadcasting) updateBroadcastData({ youtubeUrl: val });
-                      }}
-                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:border-indigo-500 placeholder:text-slate-700"
-                    />
-                  </div>
+
 
                   <div>
                     <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-3 px-1">Signal Filter (Who to Scan)</label>

@@ -27,3 +27,8 @@ dist-ssr
 .firebase/
 firebase-debug.log*
 firestore.indexes.json
+
+# Environment Variables
+.env
+.env.local
+.env.*

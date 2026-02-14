@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import * as React from 'react';
+import { useEffect, useState } from 'react';
 import { FirestoreService } from '../services/firestoreService';
 import { AuraSession } from '../types';
 
@@ -8,7 +9,7 @@ export const AdminPanel: React.FC = () => {
 
     useEffect(() => {
         // Reuse existing subscribeToRadar (which gets all sessions)
-        const unsubSessions = FirestoreService.subscribeToRadar((s) => setSessions(s));
+        const unsubSessions = FirestoreService.subscribeToRadar([0, 0], 100000000, (s) => setSessions(s));
 
         // Subscribe to all conversations
         const unsubConvs = FirestoreService.subscribeToAllConversations((c) => setConversations(c));

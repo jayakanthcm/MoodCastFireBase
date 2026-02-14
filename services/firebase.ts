@@ -3,12 +3,12 @@ import { getAuth, setPersistence, browserSessionPersistence, GoogleAuthProvider 
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyCBkX8trLJ4Fd5RYm5OMRiVPsN99hcXTyk",
-    authDomain: "aura-4006d.firebaseapp.com",
-    projectId: "aura-4006d",
-    storageBucket: "aura-4006d.firebasestorage.app",
-    messagingSenderId: "1066542852216",
-    appId: "1:1066542852216:web:b62bab52f4bc5af7eca58d"
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 // Initialize Firebase
@@ -17,7 +17,7 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 
 // Set persistence to session (clears when tab/window is closed)
-setPersistence(auth, browserSessionPersistence).catch((error) => {
+setPersistence(auth, browserSessionPersistence).catch((error: any) => {
     console.error("Error setting session persistence:", error);
 });
 
