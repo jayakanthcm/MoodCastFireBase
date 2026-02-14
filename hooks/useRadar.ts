@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { FirestoreService } from '../services/firestoreService';
 import { LiveAura } from '../types';
 import { getDistanceFromLatLonInM } from '../constants';
@@ -11,15 +11,26 @@ export const useRadar = (
 ) => {
     const [nearbyUsers, setNearbyUsers] = useState<(LiveAura & { id: string; dist: number })[]>([]);
 
+    // Use a ref to track the latest currentLocation so the onSnapshot callback
+    // always has fresh coordinates without needing to re-subscribe.
+    const locationRef = useRef(currentLocation);
+    locationRef.current = currentLocation;
+
+    // Stabilize dependency: only re-subscribe when lat/lng values actually change,
+    // not on every new object reference.
+    const lat = currentLocation?.lat ?? null;
+    const lng = currentLocation?.lng ?? null;
+
     useEffect(() => {
-        if (!currentLocation) return;
+        if (lat === null || lng === null) return;
 
         const unsubscribe = FirestoreService.subscribeToRadar(
-            [currentLocation.lat, currentLocation.lng],
+            [lat, lng],
             scanRange,
             (sessions) => {
-                // [DEBUG] Log raw session count
-                // console.log("Raw sessions from Firestore:", sessions.length);
+                // Use latest location from ref for distance calculations
+                const loc = locationRef.current;
+                if (!loc) return;
 
                 // Filter by Recency (Last 10 minutes)
                 const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
@@ -30,16 +41,14 @@ export const useRadar = (
                         const lastSeenTime = s.lastSeen?.toMillis ? s.lastSeen.toMillis() : (s.lastSeen || 0);
                         if (lastSeenTime < tenMinutesAgo) return null; // Filter stale
 
-                        const dist = getDistanceFromLatLonInM(currentLocation.lat, currentLocation.lng, s.lat, s.lng);
+                        const dist = getDistanceFromLatLonInM(loc.lat, loc.lng, s.lat, s.lng);
                         return { ...s, id: s.uid, dist };
                     })
-                    .filter((s): s is (LiveAura & { id: string, dist: number }) => s !== null && s.id !== profileId)
-                    .filter(s => s.dist <= scanRange); // Apply Distance Filter
+                    .filter((s): s is (LiveAura & { id: string, dist: number }) => s !== null && s.id !== profileId);
 
                 setNearbyUsers(mapped);
 
-                // Self-Reporting 'On Radar' Count (Vibe Coding Feature)
-                // We calculate how many people are near US, and publish it so others can see on our stamp.
+                // Self-Reporting 'On Radar' Count
                 if (isBroadcasting) {
                     const mySession = sessions.find(s => s.uid === profileId);
                     const currentCount = mySession?.stats?.inRadar || 0;
@@ -54,7 +63,7 @@ export const useRadar = (
         );
 
         return () => unsubscribe();
-    }, [profileId, currentLocation, scanRange, isBroadcasting]);
+    }, [profileId, lat, lng, scanRange, isBroadcasting]);
 
     return nearbyUsers;
 };
