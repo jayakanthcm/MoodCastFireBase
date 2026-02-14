@@ -194,18 +194,7 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount
 
-  // Real-time Session Stats Subscription
-  useEffect(() => {
-    if (!isBroadcasting) return;
-
-    // Subscribe to my own session to get real-time stats (interested count, etc)
-    const unsub = FirestoreService.subscribeToSession(profile.id, (session) => {
-      if (session && session.stats) {
-        setLiveStats(session.stats);
-      }
-    });
-    return () => unsub();
-  }, [isBroadcasting, profile.id]);
+  // Note: Real-time session stats subscription is handled by the useEffect at line 110.
 
   const toggleBroadcasting = async (shouldBroadcast: boolean) => {
     if (shouldBroadcast) {
@@ -258,22 +247,14 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
   const filteredRadarUsers = nearbyUsers.filter(user => {
     if (user.dist > scanRange) return false;
 
-    // Safety & Preference Logic
-    // Strict Seeking Preferences Filter (User Request)
-    const matchesGender = profile.seeking.gender === 'Everyone' || user.gender === profile.seeking.gender;
-    const matchesStatus = profile.seeking.status === 'All' || user.status === profile.seeking.status;
-    // We also keep Age Range as it's in the UI
-    const matchesAge = profile.seeking.ageRange === 'All' || user.ageRange === profile.seeking.ageRange;
+    // Apply seeking preference filters only when visibilityLevel is 'PREFS'
+    if (visibilityLevel === 'PREFS') {
+      const matchesGender = profile.seeking.gender === 'Everyone' || user.gender === profile.seeking.gender;
+      const matchesStatus = profile.seeking.status === 'All' || user.status === profile.seeking.status;
+      const matchesAge = profile.seeking.ageRange === 'All' || user.ageRange === profile.seeking.ageRange;
 
-    if (!matchesGender || !matchesStatus || !matchesAge) return false;
-
-    // Optional: Keep Mutual Match for Safety (Commented out if user thinks it's 'broken' but good for production)
-    // const theyLikeMyGender = user.seeking.gender === 'Everyone' || profile.identity.gender === user.seeking.gender;
-    // if (!theyLikeMyGender) return false; 
-
-    // Visibility 'PREFS' vs 'ALL' is now redundant if we always filter, 
-    // but we can keep the variable for potential future UI toggles. 
-    // For now, this core logic ensures "Seeking" settings actually work.
+      if (!matchesGender || !matchesStatus || !matchesAge) return false;
+    }
 
     if (selectedMoodFilter !== 'ALL') {
       return user.mood === selectedMoodFilter;
@@ -894,7 +875,7 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
               </div>
 
               <button
-                onClick={onWipeSession}
+                onClick={handleWipeSessionWrap}
                 className="w-full mt-8 text-[10px] font-black text-red-500/60 uppercase tracking-widest py-6 border border-red-500/10 rounded-[2.5rem] hover:bg-red-500/5 transition-all"
               >
                 WIPE AURA SESSION

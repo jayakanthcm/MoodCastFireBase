@@ -11,9 +11,27 @@ export const useLocation = (userId: string, isBroadcasting: boolean) => {
             return;
         }
 
+        let lastLat: number | null = null;
+        let lastLng: number | null = null;
+        const MIN_DISTANCE_CHANGE = 5; // meters - only update if moved at least this far
+
         const watchId = navigator.geolocation.watchPosition(
             (pos) => {
-                const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                const newLat = pos.coords.latitude;
+                const newLng = pos.coords.longitude;
+
+                // Manual distance filter: distanceFilter is not a standard browser API,
+                // so we implement our own threshold to avoid excessive updates.
+                if (lastLat !== null && lastLng !== null) {
+                    const dlat = (newLat - lastLat) * 111320; // rough meters per degree lat
+                    const dlng = (newLng - lastLng) * 111320 * Math.cos(lastLat * Math.PI / 180);
+                    const moved = Math.sqrt(dlat * dlat + dlng * dlng);
+                    if (moved < MIN_DISTANCE_CHANGE) return; // Skip update if barely moved
+                }
+
+                lastLat = newLat;
+                lastLng = newLng;
+                const newLoc = { lat: newLat, lng: newLng };
                 setCurrentLocation(newLoc);
                 setError(null);
 
@@ -22,8 +40,6 @@ export const useLocation = (userId: string, isBroadcasting: boolean) => {
                     FirestoreService.updateSession(userId, {
                         lat: newLoc.lat,
                         lng: newLoc.lng,
-                        // lastSeen is automatically handled by updateSession, but we can be explicit if needed
-                        // Service.updateSession adds serverTimestamp() to lastSeen
                     });
                 }
             },
@@ -33,8 +49,9 @@ export const useLocation = (userId: string, isBroadcasting: boolean) => {
             },
             {
                 enableHighAccuracy: true,
-                distanceFilter: 5 // Teaching Point: Update every 5 meters
-            } as any
+                maximumAge: 5000,
+                timeout: 10000
+            }
         );
 
         return () => navigator.geolocation.clearWatch(watchId);

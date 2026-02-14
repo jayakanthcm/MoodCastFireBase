@@ -138,8 +138,8 @@ export const FirestoreService = {
 
             // Calculate who is actually in range
             const nearbySessions = allSessions.filter(session => {
-                // Ensure session has lat/lng
-                if (!session.lat || !session.lng) return false;
+                // Ensure session has valid lat/lng (use typeof check to allow 0 values)
+                if (typeof session.lat !== 'number' || typeof session.lng !== 'number') return false;
 
                 const distanceInKm = geofire.distanceBetween(
                     [center[0], center[1]],
@@ -242,9 +242,9 @@ export const FirestoreService = {
 
     async adminWipeAll(): Promise<void> {
         const sessionsSnap = await getDocs(collection(db, SESSIONS_COLLECTION));
-        sessionsSnap.docs.forEach(d => deleteDoc(d.ref));
+        await Promise.all(sessionsSnap.docs.map(d => deleteDoc(d.ref)));
 
         const convSnap = await getDocs(collection(db, CONVERSATIONS_COLLECTION));
-        convSnap.docs.forEach(d => deleteDoc(d.ref));
+        await Promise.all(convSnap.docs.map(d => deleteDoc(d.ref)));
     }
 };
