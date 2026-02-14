@@ -32,6 +32,11 @@ export interface PersistentUserData {
     gender: string;
     status: string;
     statusMessage?: string;
+    seeking?: {
+        gender: string;
+        ageRange: string;
+        status: string;
+    };
     createdAt: any;
 }
 
@@ -58,10 +63,18 @@ export const FirestoreService = {
     // Create or Update persistent user profile
     async saveUserProfile(data: PersistentUserData): Promise<void> {
         const docRef = doc(db, USERS_COLLECTION, data.uid);
-        await setDoc(docRef, {
-            ...data,
-            lastUpdated: serverTimestamp()
-        }, { merge: true });
+        const { createdAt, ...rest } = data;
+        const payload: any = { ...rest, lastUpdated: serverTimestamp() };
+        // Only set createdAt on first create (when it's not null), preserve existing via merge
+        if (createdAt !== null && createdAt !== undefined) {
+            payload.createdAt = createdAt;
+        }
+        // Check if doc exists; if not, set createdAt to server timestamp
+        const existing = await getDoc(docRef);
+        if (!existing.exists()) {
+            payload.createdAt = serverTimestamp();
+        }
+        await setDoc(docRef, payload, { merge: true });
     },
 
     // --- Aura Session Methods (Live Presence) ---
@@ -80,8 +93,8 @@ export const FirestoreService = {
     async updateSession(uid: string, data: Partial<LiveAura>): Promise<void> {
         const updates: any = { ...data };
 
-        // Compute new geohash if location changes
-        if (data.lat && data.lng) {
+        // Compute new geohash if location changes (use typeof to allow 0 values)
+        if (typeof data.lat === 'number' && typeof data.lng === 'number') {
             updates.geohash = geofire.geohashForLocation([data.lat, data.lng]);
         }
 

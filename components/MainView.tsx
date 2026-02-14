@@ -322,14 +322,15 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
 
   const toggleInterest = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    const isCurrentlyLiked = likedUserIds.has(id);
+    // Perform Firestore side effect outside setState to avoid double-calls in StrictMode
+    FirestoreService.togglePulse(id, profile.id, !isCurrentlyLiked);
     setLikedUserIds(prev => {
       const next = new Set(prev);
-      if (next.has(id)) {
+      if (isCurrentlyLiked) {
         next.delete(id);
-        FirestoreService.togglePulse(id, profile.id, false);
       } else {
         next.add(id);
-        FirestoreService.togglePulse(id, profile.id, true);
       }
       return next;
     });
@@ -543,7 +544,14 @@ export const MainView: React.FC<Props> = ({ profile, onUpdateMood, onUpdateNickn
           </div>
 
           <div className="flex-1 overflow-y-auto hide-scrollbar pb-32 space-y-4 px-1">
-            {filteredRadarUsers.length === 0 ? (
+            {locationError ? (
+              <div className="py-20 text-center px-8">
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-red-400">GPS Signal Lost</p>
+                <p className="text-[8px] font-bold text-slate-600 mt-2">
+                  {locationError.code === 1 ? 'Location permission denied. Please enable GPS access in your browser settings.' : 'Unable to acquire location. Please check your device settings.'}
+                </p>
+              </div>
+            ) : filteredRadarUsers.length === 0 ? (
               <div className="py-20 text-center opacity-40 px-8">
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">No matching signals within {scanRange}M</p>
                 <p className="text-[8px] font-bold text-slate-600 mt-2">Adjust tuning or preferences in "Tune" tab</p>

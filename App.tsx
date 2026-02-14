@@ -62,9 +62,9 @@ const App: React.FC = () => {
                 stats: { interested: 0, inRadar: 0 }
               },
               seeking: {
-                gender: 'Everyone',
-                ageRange: 'All',
-                status: 'All'
+                gender: (persistentProfile.seeking?.gender as any) || 'Everyone',
+                ageRange: (persistentProfile.seeking?.ageRange as any) || 'All',
+                status: (persistentProfile.seeking?.status as any) || 'All'
               },
               mood: 'Cozy',
               location: { lat: 0, lng: 0 }
@@ -174,11 +174,9 @@ const App: React.FC = () => {
 
   const syncProfileUpdate = async (updatedProfile: UserProfile, changes: Partial<UserProfile['identity']>) => {
     try {
-      // Persist to Profile Collection
+      // Persist to Profile Collection (omit createdAt to preserve original timestamp via merge)
       await FirestoreService.saveUserProfile({
         uid: updatedProfile.id,
-        // We must merge, but saveUserProfile expects full object in this implementation.
-        // Ideally we optimize this, but for now we send the updated full identity.
         email: auth.currentUser?.email || "",
         nickname: updatedProfile.identity.nickname,
         icon: updatedProfile.identity.icon,
@@ -186,11 +184,16 @@ const App: React.FC = () => {
         gender: updatedProfile.identity.gender,
         status: updatedProfile.identity.status,
         statusMessage: updatedProfile.identity.statusMessage,
-        createdAt: null
+        seeking: updatedProfile.seeking,
+        createdAt: null // merge:true preserves existing value; only set on first create
       });
 
-      // Also update Active Session if broadcasting
-      await FirestoreService.updateSession(updatedProfile.id, changes);
+      // Only update Active Session if it exists (user is broadcasting)
+      try {
+        await FirestoreService.updateSession(updatedProfile.id, changes);
+      } catch {
+        // Session doesn't exist (not broadcasting) — ignore
+      }
     } catch (err) {
       console.error("Failed to sync profile update:", err);
     }
@@ -248,13 +251,8 @@ const App: React.FC = () => {
   };
 
   const handleWipeSession = async () => {
-    if (state.profile) {
-      try {
-        await FirestoreService.deleteSession(state.profile.id);
-      } catch (e) {
-        console.error("Failed to delete session on logout", e);
-      }
-    }
+    // Session is already deleted by handleWipeSessionWrap in MainView before this is called.
+    // Just sign out to trigger auth state reset.
     signOut(auth).catch((error) => {
       console.error("Error signing out:", error);
     });
